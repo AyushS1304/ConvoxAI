@@ -108,7 +108,7 @@ async def model_check(request: ModelTestRequest):
 
 @app.post("/summarize", response_model=SummaryResponse, tags=["Summarization"])
 async def summarize_audio(
-    audio_file: UploadFile = File(..., description="Audio file (.wav, .mp3, .m4a, .flac)")):
+    audio_file: UploadFile = File(..., description="Audio file (.wav, .mp3, .m4a, .flac,.ogg)")):
     if not audio_file:
         raise HTTPException(
             ErrorResponse(
@@ -116,7 +116,7 @@ async def summarize_audio(
                 detail="Audio file was not found in the uploaded button"
             )
         )
-    allowed_extensions = {".wav", ".mp3", ".m4a", ".flac"}
+    allowed_extensions = {".wav", ".mp3", ".m4a", ".flac",".ogg"}
     file_extension = Path(audio_file.filename).suffix.lower()
     
     if file_extension not in allowed_extensions:
