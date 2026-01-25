@@ -13,7 +13,11 @@ export const AnimatedThemeToggler = ({
   duration = 400,
   ...props
 }: AnimatedThemeTogglerProps) => {
-  const [isDark, setIsDark] = useState(false)
+  const [isDark, setIsDark] = useState(() => {
+    // Check localStorage for stored theme, default to dark
+    const storedTheme = localStorage.getItem("vite-ui-theme")
+    return storedTheme ? storedTheme === "light" : true
+  })
   const buttonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -40,7 +44,7 @@ export const AnimatedThemeToggler = ({
         const newTheme = !isDark
         setIsDark(newTheme)
         document.documentElement.classList.toggle("dark")
-        localStorage.setItem("theme", newTheme ? "dark" : "light")
+        localStorage.setItem("vite-ui-theme", newTheme ? "dark" : "light")
       })
     }).ready
 
