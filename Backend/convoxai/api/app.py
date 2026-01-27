@@ -7,6 +7,7 @@ from convoxai.core.models import SummaryResponse
 from convoxai.config import GEMINI_MODEL_NAME, WHISPER_MODEL_SIZE,GROQ_MODEL_NAME
 from convoxai.core.summarizer import create_llm,create_llm_2
 from convoxai.api import auth, storage, chat_history
+from convoxai.utils.audio import transcribe_audio_simple
 import os
 import tempfile
 import shutil
@@ -171,6 +172,37 @@ async def summarize_audio(
                 os.unlink(tmp_file_path)
             except Exception:
                 pass
+
+@app.post("/transcript",tags=['Transcript'])
+async def get_transcript(audio_file: UploadFile = File(...)):
+    if not audio_file:
+        raise HTTPException(
+            ErrorResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Audio file was not found in the uploaded button"
+            )
+        )
+    allowed_extensions = {".wav", ".mp3", ".m4a", ".flac",".ogg"}
+    file_extension = Path(audio_file.filename).suffix.lower()
+    
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            ErrorResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file format. Supported formats: {', '.join(allowed_extensions)}"
+            )
+        )
+    tmp_file_path = None
+    try:
+        tmp_file_path=save_upload_file_tmp(audio_file)
+        transcript_response=transcribe_audio_simple(str(tmp_file_path))
+        return transcript_response
+    except Exception as e:
+        raise HTTPException(
+            ErrorResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process audio file: {str(e)}"
+        ))
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):

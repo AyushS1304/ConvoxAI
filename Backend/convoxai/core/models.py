@@ -24,8 +24,6 @@ class ModelTestRequest(BaseModel):
     user_choice: Annotated[int, Field(..., description="Model choice: 1 for Google Gemini, 2 for Groq", ge=1, le=2)]
     query: Annotated[str, Field(..., description="Query to test the model with")]
 
-
-# Authentication Models
 class UserSignUp(BaseModel):
     email: EmailStr
     password: Annotated[str, Field(..., min_length=6, description="Password must be at least 6 characters")]

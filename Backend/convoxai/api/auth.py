@@ -1,9 +1,3 @@
-"""
-Authentication API Endpoints
-
-This module provides authentication endpoints for user signup, signin, signout, and user info.
-"""
-
 from fastapi import APIRouter, HTTPException, status, Depends, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from convoxai.core.models import (
@@ -12,64 +6,41 @@ from convoxai.core.models import (
 from convoxai.utils.supabase_client import (
     sign_up_user, sign_in_user, sign_out_user, get_user_from_token
 )
-from typing import Optional
 import logging
-
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 security = HTTPBearer()
 
-
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def signup(user_data: UserSignUp):
-    """
-    Register a new user
-    
-    Args:
-        user_data: User signup information (email, password, optional full_name)
-        
-    Returns:
-        User information and authentication tokens
-    """
     try:
-        # Prepare metadata
         metadata = {}
         if user_data.full_name:
             metadata["full_name"] = user_data.full_name
-        
-        # Sign up user
         result = await sign_up_user(
             email=user_data.email,
             password=user_data.password,
             metadata=metadata
-        )
-        
+        )    
         if not result.get("user") or not result.get("session"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to create user account"
             )
-        
         user = result["user"]
         session = result["session"]
-        
-        # Format response
         user_response = UserResponse(
             id=user.id,
             email=user.email,
             full_name=user.user_metadata.get("full_name") if user.user_metadata else None,
             created_at=user.created_at
         )
-        
         token_response = TokenResponse(
             access_token=session.access_token,
             refresh_token=session.refresh_token,
             user=user_response
         )
-        
         return AuthResponse(user=user_response, session=token_response)
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -82,15 +53,6 @@ async def signup(user_data: UserSignUp):
 
 @router.post("/signin", response_model=AuthResponse)
 async def signin(credentials: UserSignIn):
-    """
-    Sign in an existing user
-    
-    Args:
-        credentials: User signin credentials (email, password)
-        
-    Returns:
-        User information and authentication tokens
-    """
     try:
         result = await sign_in_user(
             email=credentials.email,
@@ -105,8 +67,6 @@ async def signin(credentials: UserSignIn):
         
         user = result["user"]
         session = result["session"]
-        
-        # Format response
         user_response = UserResponse(
             id=user.id,
             email=user.email,
@@ -134,15 +94,6 @@ async def signin(credentials: UserSignIn):
 
 @router.post("/signout")
 async def signout(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Sign out the current user
-    
-    Args:
-        credentials: Bearer token from Authorization header
-        
-    Returns:
-        Success message
-    """
     try:
         await sign_out_user(credentials.credentials)
         return {"message": "Successfully signed out"}
@@ -156,15 +107,6 @@ async def signout(credentials: HTTPAuthorizationCredentials = Depends(security))
 
 @router.get("/user", response_model=UserResponse)
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Get current user information
-    
-    Args:
-        credentials: Bearer token from Authorization header
-        
-    Returns:
-        Current user information
-    """
     try:
         user = await get_user_from_token(credentials.credentials)
         
@@ -195,18 +137,6 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def get_authenticated_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> dict:
-    """
-    Dependency to get authenticated user from token
-    
-    Args:
-        credentials: Bearer token from Authorization header
-        
-    Returns:
-        User information dictionary
-        
-    Raises:
-        HTTPException: If token is invalid or expired
-    """
     try:
         user = await get_user_from_token(credentials.credentials)
         

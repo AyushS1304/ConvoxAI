@@ -128,7 +128,6 @@ async def get_conversation_history(
             detail="Failed to retrieve conversation history"
         )
 
-
 @router.get("/{conversation_id}", response_model=ChatConversation)
 async def get_conversation(
     conversation_id: str,
