@@ -1,8 +1,16 @@
 from faster_whisper import WhisperModel
-from pydub import AudioSegment
 import warnings
 import os
 from convoxai.config import WHISPER_MODEL_SIZE
+
+# Try to import pydub, but handle Python 3.13 compatibility issue
+try:
+    from pydub import AudioSegment
+    PYDUB_AVAILABLE = True
+except (ImportError, ModuleNotFoundError) as e:
+    PYDUB_AVAILABLE = False
+    import logging
+    logging.warning(f"pydub not available (Python 3.13+ compatibility issue): {e}")
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -14,6 +22,11 @@ def get_whisper_model(model_size):
     return _MODEL_CACHE[model_size]
 
 def convert_to_wav(input_file_path, output_file_path):
+    if not PYDUB_AVAILABLE:
+        raise RuntimeError(
+            "Audio conversion requires pydub, which is not available in Python 3.13+. "
+            "Please use Python 3.11 or 3.12, or provide audio files in WAV format."
+        )
     try:
         audio = AudioSegment.from_file(input_file_path)
         audio.export(output_file_path, format="wav")
