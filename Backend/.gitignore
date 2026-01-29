@@ -50,7 +50,4 @@ Thumbs.db
 # Project specific
 data/temp/
 data/uploads/
-*.wav
-*.mp3
-*.m4a
 logs/
