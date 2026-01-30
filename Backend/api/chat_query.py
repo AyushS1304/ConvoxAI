@@ -14,6 +14,7 @@ async def query_chatbot(
     request: ChatQueryRequest,
     user: dict = Depends(get_authenticated_user)
 ):
+    logger.info(f"Chat query received from user_id: {user.id}, question: {request.question[:50]}...")
     try:
         chat_history = None
         if request.chat_history:
@@ -33,13 +34,14 @@ async def query_chatbot(
             )
             for src in result.get("sources", [])
         ]
+        logger.info(f"Chat query processed successfully, sources: {len(sources)}, model: {result['model_used']}")
         return ChatQueryResponse(
             answer=result["answer"],
             sources=sources,
             model_used=result["model_used"]
         )
     except Exception as e:  
-        logger.error(f"Chatbot query error: {str(e)}")
+        logger.error(f"Chatbot query error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process chatbot query: {str(e)}"

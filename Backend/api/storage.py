@@ -38,6 +38,7 @@ async def upload_audio_file(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     user=Depends(get_authenticated_user),
 ):
+    logger.info(f"File upload initiated: {audio_file.filename} by user={user.id}")
     try:
         ext = Path(audio_file.filename).suffix.lower()
         if ext not in ALLOWED_EXTENSIONS:
@@ -48,6 +49,7 @@ async def upload_audio_file(
 
         file_data = await audio_file.read()
         file_size = len(file_data)
+        logger.debug(f"File read: size={file_size} bytes, type={audio_file.content_type}")
 
         # if file_size > MAX_FILE_SIZE:
         #     raise HTTPException(413, "File too large (max 50MB)")
@@ -64,6 +66,7 @@ async def upload_audio_file(
             file_data=file_data,
             content_type=audio_file.content_type,
         )
+        logger.debug(f"File uploaded to storage: {storage_path}")
 
         metadata = {
             "id": file_id,
@@ -79,7 +82,8 @@ async def upload_audio_file(
             data=metadata,
             access_token=credentials.credentials,
         )
-
+        
+        logger.info(f"File upload successful: {audio_file.filename}, file_id={file_id}")
         return AudioFileUploadResponse(
             file_id=file_id,
             filename=audio_file.filename,
@@ -98,6 +102,7 @@ async def upload_audio_file(
 
 @router.get("/files", response_model=List[AudioFileMetadata])
 async def list_user_files(user=Depends(get_authenticated_user)):
+    logger.debug(f"Listing files for user_id: {user.id}")
     try:
         files = await get_records(
             table="audio_files",
@@ -105,6 +110,7 @@ async def list_user_files(user=Depends(get_authenticated_user)):
             order_by="created_at.desc",
             limit=100,
         )
+        logger.info(f"Retrieved {len(files)} files for user_id: {user.id}")
         return [AudioFileMetadata(**f) for f in files]
 
     except Exception:
@@ -116,6 +122,7 @@ async def list_user_files(user=Depends(get_authenticated_user)):
 
 @router.get("/file/{file_id}")
 async def get_file(file_id: str, user=Depends(get_authenticated_user)):
+    logger.debug(f"Retrieving file: file_id={file_id}, user_id={user.id}")
     try:
         files = await get_records(
             table="audio_files",
@@ -132,7 +139,8 @@ async def get_file(file_id: str, user=Depends(get_authenticated_user)):
             file_path=meta["storage_path"],
             expires_in=300,
         )
-
+        
+        logger.info(f"File retrieved: file_id={file_id}, filename={meta['filename']}")
         return {
             "file_id": meta["id"],
             "filename": meta["filename"],
@@ -156,6 +164,7 @@ async def delete_file(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     user=Depends(get_authenticated_user),
 ):
+    logger.info(f"File deletion requested: file_id={file_id}, user_id={user.id}")
     try:
         files = await get_records(
             table="audio_files",
@@ -174,7 +183,8 @@ async def delete_file(
             record_id=file_id,
             access_token=credentials.credentials,
         )
-
+        
+        logger.info(f"File deleted successfully: file_id={file_id}")
         return {"message": "File deleted successfully"}
 
     except HTTPException:

@@ -12,7 +12,9 @@ from config import (
     GROQ_TEMPERATURE
 )
 from core.models import SummaryResponse
+import logging
 
+logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore")
 
 def create_gemini_llm():
@@ -32,12 +34,20 @@ def create_groq_llm():
     )
 
 def generate_summary(audio_file_path: str | None = None) -> dict:
+    logger.info(f"Generating summary for audio file: {audio_file_path}")
     if audio_file_path is None:
+        logger.error("No audio file path provided")
         raise ValueError("Provide the valid Audio File for processing")
+    
+    logger.debug("Starting transcription...")
     transcript = transcribe_audio_simple(audio_file_path)
+    logger.debug(f"Transcription complete, length: {len(transcript)} characters")
+    
+    logger.debug("Generating summary with Gemini...")
     llm = create_gemini_llm()
     st_llm = llm.with_structured_output(SummaryResponse)
     final_prompt = system_prompt.format(transcript=transcript)
     response = st_llm.invoke(final_prompt)
+    logger.info("Summary generation complete")
     return response
 

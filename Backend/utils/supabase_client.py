@@ -49,6 +49,7 @@ def get_authed_rls_client(access_token: str) -> Client:
 # ------------------------------------------------------------------
 
 async def sign_up_user(email: str, password: str, metadata: Optional[Dict[str, Any]] = None):
+    logger.debug(f"Signing up user: {email}")
     client = SupabaseClient.anon()
 
     data = {"email": email, "password": password}
@@ -57,11 +58,14 @@ async def sign_up_user(email: str, password: str, metadata: Optional[Dict[str, A
 
     res = client.auth.sign_up(data)
     if not res.user:
+        logger.error(f"Failed to create user: {email}")
         raise Exception("Failed to create user")
+    logger.debug(f"User created successfully: {email}")
     return {"user": res.user, "session": res.session}
 
 
 async def sign_in_user(email: str, password: str):
+    logger.debug(f"Signing in user: {email}")
     client = SupabaseClient.anon()
 
     res = client.auth.sign_in_with_password({
@@ -70,8 +74,10 @@ async def sign_in_user(email: str, password: str):
     })
 
     if not res.user:
+        logger.warning(f"Invalid credentials for: {email}")
         raise Exception("Invalid credentials")
-
+    
+    logger.debug(f"User signed in successfully: {email}")
     return {"user": res.user, "session": res.session}
 
 
@@ -81,9 +87,11 @@ async def sign_out_user():
 
 
 async def get_user_from_token(access_token: str):
+    logger.debug("Getting user from access token")
     client = SupabaseClient.anon()
     res = client.auth.get_user(access_token)
     if not res.user:
+        logger.warning("Invalid or expired access token")
         raise Exception("Invalid token")
     return res.user
 
@@ -98,6 +106,7 @@ async def upload_file_to_storage(
     file_data: bytes,
     content_type: str,
 ) -> str:
+    logger.debug(f"Uploading file to storage: bucket={bucket_name}, path={file_path}")
     client = SupabaseClient.service()
 
     client.storage.from_(bucket_name).upload(
@@ -110,15 +119,20 @@ async def upload_file_to_storage(
     )
 
     # Return public URL
-    return client.storage.from_(bucket_name).get_public_url(file_path)
+    public_url = client.storage.from_(bucket_name).get_public_url(file_path)
+    logger.info(f"File uploaded successfully to: {file_path}")
+    return public_url
 
 
 async def delete_file_from_storage(bucket_name: str, file_path: str):
+    logger.debug(f"Deleting file from storage: bucket={bucket_name}, path={file_path}")
     client = SupabaseClient.service()
     client.storage.from_(bucket_name).remove([file_path])
+    logger.info(f"File deleted from storage: {file_path}")
 
 
 async def get_signed_file_url(bucket_name: str, file_path: str, expires_in: int):
+    logger.debug(f"Creating signed URL for: {file_path}, expires_in={expires_in}s")
     client = SupabaseClient.service()
     res = client.storage.from_(bucket_name).create_signed_url(file_path, expires_in)
     return res["signedURL"]
@@ -129,14 +143,18 @@ async def get_signed_file_url(bucket_name: str, file_path: str, expires_in: int)
 # ------------------------------------------------------------------
 
 async def insert_record(table: str, data: Dict[str, Any], access_token: str):
+    logger.debug(f"Inserting record into table: {table}")
     client = get_authed_rls_client(access_token)
     res = client.table(table).insert(data).execute()
+    logger.debug(f"Record inserted into {table}")
     return res.data[0]
 
 
 async def update_record(table: str, record_id: str, data: Dict[str, Any], access_token: str):
+    logger.debug(f"Updating record in table: {table}, id={record_id}")
     client = get_authed_rls_client(access_token)
     res = client.table(table).update(data).eq("id", record_id).execute()
+    logger.debug(f"Record updated in {table}")
     return res.data[0]
 
 
@@ -146,6 +164,7 @@ async def get_records(
     order_by: Optional[str] = None,
     limit: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
+    logger.debug(f"Getting records from table: {table}, filters={filters}")
     client = SupabaseClient.service()
     q = client.table(table).select("*")
 
@@ -163,9 +182,12 @@ async def get_records(
         q = q.limit(limit)
 
     res = q.execute()
+    logger.debug(f"Retrieved {len(res.data or [])} records from {table}")
     return res.data or []
 
 
 async def delete_record(table: str, record_id: str, access_token: str):
+    logger.debug(f"Deleting record from table: {table}, id={record_id}")
     client = get_authed_rls_client(access_token)
     client.table(table).delete().eq("id", record_id).execute()
+    logger.debug(f"Record deleted from {table}")

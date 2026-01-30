@@ -14,6 +14,7 @@ security = HTTPBearer()
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def signup(user_data: UserSignUp):
+    logger.info(f"Signup attempt for email: {user_data.email}")
     try:
         metadata = {}
         if user_data.full_name:
@@ -36,6 +37,7 @@ async def signup(user_data: UserSignUp):
             refresh_token=session.refresh_token,
             user=user_response
         )
+        logger.info(f"User signup successful: {user_data.email}")
         return AuthResponse(user=user_response, session=token_response)
     except HTTPException:
         raise
@@ -49,6 +51,7 @@ async def signup(user_data: UserSignUp):
 
 @router.post("/signin", response_model=AuthResponse)
 async def signin(credentials: UserSignIn):
+    logger.info(f"Signin attempt for email: {credentials.email}")
     try:
         result = await sign_in_user(
             email=credentials.email,
@@ -71,6 +74,7 @@ async def signin(credentials: UserSignIn):
             user=user_response
         )
         
+        logger.info(f"User signin successful: {credentials.email}")
         return AuthResponse(user=user_response, session=token_response)
         
     except HTTPException:
@@ -87,6 +91,7 @@ async def signin(credentials: UserSignIn):
 async def signout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         await sign_out_user(credentials.credentials)
+        logger.info("User signout successful")
         return {"message": "Successfully signed out"}
     except Exception as e:
         logger.error(f"Signout error: {str(e)}")

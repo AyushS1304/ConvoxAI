@@ -36,6 +36,7 @@ async def validate_audio_file(
     Raises:
         HTTPException: If validation fails
     """
+    logger.debug(f"Validating audio file: {audio_file.filename}")
     if not audio_file:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -60,4 +61,5 @@ async def validate_audio_file(
     
     # Reset file pointer for subsequent reads
     await audio_file.seek(0)
+    logger.debug(f"Audio file validation passed: {audio_file.filename}, size={len(contents)} bytes")
     return contents

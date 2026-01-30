@@ -37,6 +37,7 @@ async def save_conversation(
     Returns:
         Saved conversation with ID
     """
+    logger.info(f"Saving conversation: title='{conversation_data.title}', user_id={user.id}")
     try:
         conversation_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
@@ -64,6 +65,7 @@ async def save_conversation(
             }
             await insert_record("chat_messages", message_data)
         
+        logger.info(f"Conversation saved: conversation_id={conversation_id}, messages={len(conversation_data.messages)}")
         return ChatConversation(
             id=conversation_id,
             user_id=user.id,
@@ -96,6 +98,7 @@ async def get_conversation_history(
     Returns:
         List of conversations with metadata
     """
+    logger.debug(f"Retrieving conversation history for user_id: {user.id}, limit={limit}")
     try:
         conversations = await get_records(
             table_name="chat_conversations",
@@ -120,6 +123,7 @@ async def get_conversation_history(
                 updated_at=conv["updated_at"]
             ))
         
+        logger.info(f"Retrieved {len(result)} conversations for user_id: {user.id}")
         return result
         
     except Exception as e:
@@ -144,6 +148,7 @@ async def get_conversation(
     Returns:
         Complete conversation with messages
     """
+    logger.debug(f"Retrieving conversation: conversation_id={conversation_id}, user_id={user.id}")
     try:
         # Get conversation
         conversation = await get_user_conversation(conversation_id, user.id)
@@ -165,6 +170,7 @@ async def get_conversation(
             for msg in messages_data
         ]
         
+        logger.info(f"Retrieved conversation: conversation_id={conversation_id}, messages={len(messages)}")
         return ChatConversation(
             id=conversation["id"],
             user_id=conversation["user_id"],
@@ -199,6 +205,7 @@ async def delete_conversation(
     Returns:
         Success message
     """
+    logger.info(f"Deleting conversation: conversation_id={conversation_id}, user_id={user.id}")
     try:
         # Verify conversation belongs to user
         conversation = await get_user_conversation(conversation_id, user.id)
@@ -215,6 +222,7 @@ async def delete_conversation(
         # Delete conversation
         await delete_record("chat_conversations", conversation_id)
         
+        logger.info(f"Conversation deleted: conversation_id={conversation_id}")
         return {"message": "Conversation deleted successfully"}
         
     except HTTPException:

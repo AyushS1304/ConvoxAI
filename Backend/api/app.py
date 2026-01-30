@@ -65,6 +65,7 @@ def save_upload_file_tmp(upload_file: UploadFile) -> Path:
 
 @app.get("/", tags=["Root"])
 async def root():
+    logger.debug("Root endpoint accessed")
     return {
         "message": "Welcome to ConvoxAI API",
         "version": "1.0.0",
@@ -75,12 +76,14 @@ async def root():
 @app.post("/models", response_model=APIResponse, tags=["Model"])
 async def model_check(request: ModelTestRequest):
     """Test LLM model connectivity and functionality."""
+    logger.info(f"Model test requested: choice={request.user_choice}")
     models = {
         1: ("Google Gemini", create_gemini_llm(), GEMINI_MODEL_NAME),
         2: ("Groq", create_groq_llm(), GROQ_MODEL_NAME)
     }
     
     if request.user_choice not in models:
+        logger.warning(f"Invalid model choice: {request.user_choice}")
         return APIResponse(
             status="Failed",
             message="Invalid model choice. Must be 1 (Gemini) or 2 (Groq)",
@@ -92,9 +95,11 @@ async def model_check(request: ModelTestRequest):
         )
     
     model_name, llm, model_id = models[request.user_choice]
+    logger.debug(f"Testing {model_name} with query: {request.query[:50]}...")
     
     try:
         response = llm.invoke(request.query)
+        logger.info(f"{model_name} test successful")
         return APIResponse(
             status="Success",
             message=f"{model_name} is working! Response: {response.content[:100]}...",
@@ -121,20 +126,25 @@ async def model_check(request: ModelTestRequest):
 async def summarize_audio(
     audio_file: UploadFile = File(..., description="Audio file (.wav, .mp3, .m4a, .flac,.ogg)")):
     
+    logger.info(f"Summarization request received: file={audio_file.filename}")
     # Validate file
     await validate_audio_file(audio_file)
     
     tmp_file_path = None
     try:
         tmp_file_path = save_upload_file_tmp(audio_file)
+        logger.debug(f"Processing audio file at: {tmp_file_path}")
         summary_response = generate_summary(str(tmp_file_path))
+        logger.info(f"Summary generated successfully for: {audio_file.filename}")
         return summary_response
     except ValueError as ve:
+        logger.warning(f"Validation error for {audio_file.filename}: {str(ve)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(ve)
         )
     except Exception as e:
+        logger.error(f"Summarization failed for {audio_file.filename}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process audio file: {str(e)}"
@@ -149,15 +159,19 @@ async def summarize_audio(
 @app.post("/transcript", tags=['Transcript'])
 async def get_transcript(audio_file: UploadFile = File(...)):
     
+    logger.info(f"Transcript request received: file={audio_file.filename}")
     # Validate file
     await validate_audio_file(audio_file)
     
     tmp_file_path = None
     try:
         tmp_file_path=save_upload_file_tmp(audio_file)
+        logger.debug(f"Transcribing audio file at: {tmp_file_path}")
         transcript_response=transcribe_audio_simple(str(tmp_file_path))
+        logger.info(f"Transcript generated successfully for: {audio_file.filename}")
         return transcript_response
     except Exception as e:
+        logger.error(f"Transcription failed for {audio_file.filename}: {str(e)}", exc_info=True)
         raise HTTPException(
             ErrorResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -184,10 +198,10 @@ async def general_exception_handler(request, exc):
 
 @app.on_event("startup")
 async def startup_event():
-    print(" 🟢 Starting with the Application")
-    pass
+    logger.info("🟢 FastAPI application startup complete")
+    logger.info("All routers registered and middleware configured")
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    print(" 🛑 Shutting down the Application")
-    pass
+    logger.info("🛑 FastAPI application shutting down")
+    logger.info("Cleaning up resources...")
