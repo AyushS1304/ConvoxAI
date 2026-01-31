@@ -28,7 +28,7 @@ async def get_user_conversation(
         HTTPException: If conversation not found or doesn't belong to user
     """
     conversations = await get_records(
-        table_name="chat_conversations",
+        table="chat_conversations",
         filters={"id": conversation_id, "user_id": user_id}
     )
     
@@ -59,7 +59,7 @@ async def get_user_file(
         HTTPException: If file not found or doesn't belong to user
     """
     files = await get_records(
-        table_name="audio_files",
+        table="audio_files",
         filters={"id": file_id, "user_id": user_id}
     )
     

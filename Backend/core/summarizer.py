@@ -49,5 +49,15 @@ def generate_summary(audio_file_path: str | None = None) -> dict:
     final_prompt = system_prompt.format(transcript=transcript)
     response = st_llm.invoke(final_prompt)
     logger.info("Summary generation complete")
-    return response
+    
+    # Return both the structured response and the transcript
+    return {
+        "summary": response.summary,
+        "duration_minutes": response.duration_minutes,
+        "no_of_participants": response.no_of_participants,
+        "key_aspects": response.key_aspects,
+        "sentiment": response.sentiment,
+        "transcript": transcript
+    }
+
 

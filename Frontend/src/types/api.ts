@@ -11,12 +11,12 @@ export interface APIResponse {
 }
 
 export interface SummaryResponse {
-  status: string;
+  status?: string;
   summary: string;
   transcript?: string;
   duration_minutes?: number;
   no_of_participants?: number;
-  sentiment?: string;
+  sentiment?: 'Positive' | 'Negative' | 'Neutral';
   key_aspects?: string[];
   metadata?: {
     file_name: string;

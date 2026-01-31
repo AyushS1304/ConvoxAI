@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react"
-import { Send, Paperclip, Mic, Trash2 } from "lucide-react"
+import { Send, Paperclip, Mic, Trash2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { saveConversation, getConversationHistory, getConversation, deleteConversation, type ChatMessage, type ConversationListItem } from "@/lib/api"
+import { saveConversation, getConversationHistory, getConversation, deleteConversation, queryChatbot, addMessagesToConversation, type ChatMessage, type ConversationListItem } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
 
 interface ChatInterfaceProps {
@@ -22,6 +22,7 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
   const [conversations, setConversations] = useState<ConversationListItem[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   // Load conversation history on mount (only if user is authenticated)
   useEffect(() => {
@@ -54,7 +55,7 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
   }
 
   const handleSend = async () => {
-    if (!input.trim()) return
+    if (!input.trim() || isLoading) return
 
     const newMessage: ChatMessage = {
       role: "user",
@@ -64,39 +65,62 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
     const updatedMessages = [...messages, newMessage]
     setMessages(updatedMessages)
     setInput("")
+    setIsLoading(true)
 
-    // Auto-save conversation after each message
-    await saveCurrentConversation(updatedMessages)
+    try {
+      // Get AI response from chatbot API
+      const response = await queryChatbot(
+        input,
+        messages.filter(m => m.role === 'user' || m.role === 'assistant'),
+        'gemini'
+      )
 
-    // TODO: Add AI response here
-    // For now, just acknowledge the message
-    setTimeout(() => {
       const aiResponse: ChatMessage = {
         role: "assistant",
-        content: "I've received your message. This is a placeholder response. AI integration coming soon!",
+        content: response.answer,
       }
       const messagesWithAI = [...updatedMessages, aiResponse]
       setMessages(messagesWithAI)
-      saveCurrentConversation(messagesWithAI)
-    }, 500)
+
+      // Save only the new messages (user + AI response) to conversation
+      await saveCurrentConversation([newMessage, aiResponse])
+    } catch (error) {
+      console.error('Failed to get AI response:', error)
+      const errorResponse: ChatMessage = {
+        role: "assistant",
+        content: "I'm sorry, I encountered an error processing your request. Please try again.",
+      }
+      const messagesWithError = [...updatedMessages, errorResponse]
+      setMessages(messagesWithError)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const saveCurrentConversation = async (messagesToSave: ChatMessage[]) => {
-    if (!user || messagesToSave.length === 0) return
+  const saveCurrentConversation = async (newMessages: ChatMessage[]) => {
+    if (!user || newMessages.length === 0) return
 
     setIsSaving(true)
     try {
-      // Generate title from first user message
-      const firstUserMessage = messagesToSave.find(m => m.role === 'user')
-      const title = firstUserMessage 
-        ? firstUserMessage.content.substring(0, 50) + (firstUserMessage.content.length > 50 ? '...' : '')
-        : 'New Conversation'
+      if (currentConversationId) {
+        // Conversation exists, just add the new messages
+        await addMessagesToConversation(currentConversationId, newMessages)
+      } else {
+        // New conversation - save with all messages including welcome
+        const allMessages = messages.concat(newMessages.filter(m => !messages.includes(m)))
+        
+        // Generate title from first user message
+        const firstUserMessage = allMessages.find(m => m.role === 'user')
+        const title = firstUserMessage 
+          ? firstUserMessage.content.substring(0, 50) + (firstUserMessage.content.length > 50 ? '...' : '')
+          : 'New Conversation'
 
-      const saved = await saveConversation(title, messagesToSave)
-      setCurrentConversationId(saved.id)
-      
-      // Reload conversations to show the new one
-      await loadConversations()
+        const saved = await saveConversation(title, allMessages)
+        setCurrentConversationId(saved.id)
+        
+        // Reload conversations to show the new one
+        await loadConversations()
+      }
     } catch (error) {
       console.error('Failed to save conversation:', error)
     } finally {
@@ -181,7 +205,7 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
         <div className="border-b border-border p-6">
           <h2 className="text-xl font-bold text-foreground">Call Analysis Chat</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {isSaving ? 'Saving...' : 'Ask questions about your calls'}
+            {isLoading ? 'AI is thinking...' : isSaving ? 'Saving...' : 'Ask questions about your calls'}
           </p>
         </div>
 
@@ -208,6 +232,16 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
                 </div>
               </div>
             ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="max-w-md px-4 py-3 rounded-lg bg-muted text-foreground">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </ScrollArea>
 
@@ -232,10 +266,10 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
               </div>
               <Button
                 onClick={handleSend}
-                disabled={!input.trim() || isSaving}
+                disabled={!input.trim() || isSaving || isLoading}
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
-                <Send className="w-4 h-4" />
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </Button>
             </div>
           </div>

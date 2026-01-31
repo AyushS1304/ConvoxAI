@@ -5,6 +5,7 @@ Upload, list, fetch and delete audio files using Supabase Storage + RLS
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends
 from fastapi.security import HTTPAuthorizationCredentials
+from pydantic import BaseModel
 from core.models import AudioFileMetadata, AudioFileUploadResponse
 from utils.supabase_client import (
     upload_file_to_storage,
@@ -13,13 +14,15 @@ from utils.supabase_client import (
     insert_record,
     get_records,
     delete_record,
+    update_record,
 )
-from api.auth import get_authenticated_user, security
+from api.auth import get_authenticated_user, security, AuthContext
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 import logging
 import uuid
 from datetime import datetime
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +31,16 @@ router = APIRouter(prefix="/storage", tags=["Storage"])
 AUDIO_BUCKET = "audio-files"
 ALLOWED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".ogg"}
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+
+
+# Request model for updating summary data
+class UpdateSummaryRequest(BaseModel):
+    summary: Optional[str] = None
+    transcript: Optional[str] = None
+    key_aspects: Optional[List[str]] = None
+    duration_minutes: Optional[int] = None
+    no_of_participants: Optional[int] = None
+    sentiment: Optional[str] = None
 
 
 # ---------------- UPLOAD ---------------- #
@@ -192,3 +205,61 @@ async def delete_file(
     except Exception:
         logger.exception("Delete failed")
         raise HTTPException(500, "Failed to delete file")
+
+
+# ---------------- UPDATE SUMMARY ---------------- #
+
+@router.put("/file/{file_id}/summary")
+async def update_file_summary(
+    file_id: str,
+    summary_data: UpdateSummaryRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    user=Depends(get_authenticated_user),
+):
+    """Update the summary data for an audio file."""
+    logger.info(f"Updating summary for file_id={file_id}, user_id={user.id}")
+    try:
+        # Verify file belongs to user
+        files = await get_records(
+            table="audio_files",
+            filters={"id": file_id, "user_id": user.id},
+        )
+
+        if not files:
+            raise HTTPException(404, "File not found")
+
+        # Build update data (only include non-None values)
+        update_data = {}
+        if summary_data.summary is not None:
+            update_data["summary"] = summary_data.summary
+        if summary_data.transcript is not None:
+            update_data["transcript"] = summary_data.transcript
+        if summary_data.key_aspects is not None:
+            update_data["key_aspects"] = json.dumps(summary_data.key_aspects)
+        if summary_data.duration_minutes is not None:
+            update_data["duration_minutes"] = summary_data.duration_minutes
+        if summary_data.no_of_participants is not None:
+            update_data["no_of_participants"] = summary_data.no_of_participants
+        if summary_data.sentiment is not None:
+            update_data["sentiment"] = summary_data.sentiment
+        
+        if not update_data:
+            return {"message": "No data to update"}
+        
+        update_data["updated_at"] = datetime.utcnow().isoformat()
+
+        await update_record(
+            table="audio_files",
+            record_id=file_id,
+            data=update_data,
+            access_token=credentials.credentials,
+        )
+
+        logger.info(f"Summary updated for file_id={file_id}")
+        return {"message": "Summary updated successfully", "file_id": file_id}
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Update summary failed")
+        raise HTTPException(500, "Failed to update summary")

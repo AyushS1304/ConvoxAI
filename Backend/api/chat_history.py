@@ -6,11 +6,11 @@ This module provides endpoints for saving, retrieving, and managing chat convers
 
 from fastapi import APIRouter, HTTPException, status, Depends
 from core.models import (
-    ChatConversation, SaveConversationRequest, ConversationListResponse, ChatMessage
+    ChatConversation, SaveConversationRequest, ConversationListResponse, ChatMessage, AddMessagesRequest
 )
 from utils.supabase_client import insert_record, get_records, delete_record, update_record
 from utils.db_helpers import get_user_conversation
-from api.auth import get_authenticated_user
+from api.auth import get_authenticated_user, AuthContext
 from typing import List
 import logging
 import uuid
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/chat", tags=["Chat History"])
 @router.post("/save", response_model=ChatConversation)
 async def save_conversation(
     conversation_data: SaveConversationRequest,
-    user: dict = Depends(get_authenticated_user)
+    auth: AuthContext = Depends(get_authenticated_user)
 ):
     """
     Save a chat conversation
@@ -37,7 +37,7 @@ async def save_conversation(
     Returns:
         Saved conversation with ID
     """
-    logger.info(f"Saving conversation: title='{conversation_data.title}', user_id={user.id}")
+    logger.info(f"Saving conversation: title='{conversation_data.title}', user_id={auth.id}")
     try:
         conversation_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
@@ -45,13 +45,13 @@ async def save_conversation(
         # Save conversation
         conversation = {
             "id": conversation_id,
-            "user_id": user.id,
+            "user_id": auth.id,
             "title": conversation_data.title,
             "created_at": now,
             "updated_at": now
         }
         
-        await insert_record("chat_conversations", conversation)
+        await insert_record("chat_conversations", conversation, auth.access_token)
         
         # Save messages
         for message in conversation_data.messages:
@@ -63,12 +63,12 @@ async def save_conversation(
                 "audio_file_id": message.audio_file_id,
                 "created_at": message.created_at.isoformat() if message.created_at else now
             }
-            await insert_record("chat_messages", message_data)
+            await insert_record("chat_messages", message_data, auth.access_token)
         
         logger.info(f"Conversation saved: conversation_id={conversation_id}, messages={len(conversation_data.messages)}")
         return ChatConversation(
             id=conversation_id,
-            user_id=user.id,
+            user_id=auth.id,
             title=conversation_data.title,
             messages=conversation_data.messages,
             created_at=now,
@@ -86,7 +86,7 @@ async def save_conversation(
 @router.get("/history", response_model=List[ConversationListResponse])
 async def get_conversation_history(
     limit: int = 50,
-    user: dict = Depends(get_authenticated_user)
+    auth: AuthContext = Depends(get_authenticated_user)
 ):
     """
     Get user's conversation history
@@ -98,11 +98,11 @@ async def get_conversation_history(
     Returns:
         List of conversations with metadata
     """
-    logger.debug(f"Retrieving conversation history for user_id: {user.id}, limit={limit}")
+    logger.debug(f"Retrieving conversation history for user_id: {auth.id}, limit={limit}")
     try:
         conversations = await get_records(
-            table_name="chat_conversations",
-            filters={"user_id": user.id},
+            table="chat_conversations",
+            filters={"user_id": auth.id},
             order_by="updated_at",
             limit=limit
         )
@@ -111,7 +111,7 @@ async def get_conversation_history(
         for conv in conversations:
             # Get message count
             messages = await get_records(
-                table_name="chat_messages",
+                table="chat_messages",
                 filters={"conversation_id": conv["id"]}
             )
             
@@ -123,7 +123,7 @@ async def get_conversation_history(
                 updated_at=conv["updated_at"]
             ))
         
-        logger.info(f"Retrieved {len(result)} conversations for user_id: {user.id}")
+        logger.info(f"Retrieved {len(result)} conversations for user_id: {auth.id}")
         return result
         
     except Exception as e:
@@ -136,7 +136,7 @@ async def get_conversation_history(
 @router.get("/{conversation_id}", response_model=ChatConversation)
 async def get_conversation(
     conversation_id: str,
-    user: dict = Depends(get_authenticated_user)
+    auth: AuthContext = Depends(get_authenticated_user)
 ):
     """
     Get a specific conversation with all messages
@@ -148,14 +148,14 @@ async def get_conversation(
     Returns:
         Complete conversation with messages
     """
-    logger.debug(f"Retrieving conversation: conversation_id={conversation_id}, user_id={user.id}")
+    logger.debug(f"Retrieving conversation: conversation_id={conversation_id}, user_id={auth.id}")
     try:
         # Get conversation
-        conversation = await get_user_conversation(conversation_id, user.id)
+        conversation = await get_user_conversation(conversation_id, auth.id)
         
         # Get messages
         messages_data = await get_records(
-            table_name="chat_messages",
+            table="chat_messages",
             filters={"conversation_id": conversation_id},
             order_by="created_at"
         )
@@ -193,7 +193,7 @@ async def get_conversation(
 @router.delete("/{conversation_id}")
 async def delete_conversation(
     conversation_id: str,
-    user: dict = Depends(get_authenticated_user)
+    auth: AuthContext = Depends(get_authenticated_user)
 ):
     """
     Delete a conversation and all its messages
@@ -205,22 +205,22 @@ async def delete_conversation(
     Returns:
         Success message
     """
-    logger.info(f"Deleting conversation: conversation_id={conversation_id}, user_id={user.id}")
+    logger.info(f"Deleting conversation: conversation_id={conversation_id}, user_id={auth.id}")
     try:
         # Verify conversation belongs to user
-        conversation = await get_user_conversation(conversation_id, user.id)
+        conversation = await get_user_conversation(conversation_id, auth.id)
         
         # Delete messages first (due to foreign key constraint)
         messages = await get_records(
-            table_name="chat_messages",
+            table="chat_messages",
             filters={"conversation_id": conversation_id}
         )
         
         for message in messages:
-            await delete_record("chat_messages", message["id"])
+            await delete_record("chat_messages", message["id"], auth.access_token)
         
         # Delete conversation
-        await delete_record("chat_conversations", conversation_id)
+        await delete_record("chat_conversations", conversation_id, auth.access_token)
         
         logger.info(f"Conversation deleted: conversation_id={conversation_id}")
         return {"message": "Conversation deleted successfully"}
@@ -232,4 +232,61 @@ async def delete_conversation(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete conversation"
+        )
+
+
+@router.post("/{conversation_id}/messages")
+async def add_messages(
+    conversation_id: str,
+    request: AddMessagesRequest,
+    auth: AuthContext = Depends(get_authenticated_user)
+):
+    """
+    Add messages to an existing conversation
+    
+    Args:
+        conversation_id: Conversation ID
+        request: Messages to add
+        auth: Authenticated user (from dependency)
+        
+    Returns:
+        Success message with message count
+    """
+    logger.info(f"Adding messages to conversation: conversation_id={conversation_id}, user_id={auth.id}")
+    try:
+        # Verify conversation belongs to user
+        conversation = await get_user_conversation(conversation_id, auth.id)
+        
+        now = datetime.utcnow().isoformat()
+        
+        # Save messages
+        for message in request.messages:
+            message_data = {
+                "id": str(uuid.uuid4()),
+                "conversation_id": conversation_id,
+                "role": message.role,
+                "content": message.content,
+                "audio_file_id": message.audio_file_id,
+                "created_at": message.created_at.isoformat() if message.created_at else now
+            }
+            await insert_record("chat_messages", message_data, auth.access_token)
+        
+        # Update conversation's updated_at
+        await update_record(
+            "chat_conversations",
+            conversation_id,
+            {"updated_at": now},
+            auth.access_token
+        )
+        
+        logger.info(f"Messages added: conversation_id={conversation_id}, count={len(request.messages)}")
+        return {"message": f"Added {len(request.messages)} messages", "conversation_id": conversation_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Add messages error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to add messages"
         )

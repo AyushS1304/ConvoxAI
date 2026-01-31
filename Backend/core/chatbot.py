@@ -2,6 +2,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_classic.chains import ConversationalRetrievalChain
 from langchain_core.prompts import PromptTemplate
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from core.prompts.templates import CHATBOT_PROMPT
 from utils.vector_store import get_retriever
 from typing import List, Dict, Optional
@@ -17,6 +18,20 @@ from config import (
 chatbot_prompt_template = PromptTemplate.from_template(
     template=CHATBOT_PROMPT
 )
+
+# System prompt for direct context-based chat
+DIRECT_CHAT_SYSTEM_PROMPT = """You are an AI assistant specialized in analyzing call summaries and transcripts.
+Your role is to help users understand their call data by answering questions based on the provided context.
+
+Instructions:
+- Provide clear, concise answers based on the context provided
+- If the context doesn't contain relevant information, politely say so
+- Reference specific calls or participants when relevant
+- Be helpful and professional in your responses
+- If asked about summaries, key points, or sentiments, extract that information from the context
+- When listing information, use clear formatting
+
+{user_context}"""
 
 def create_chatbot_llm(model_choice: str = "gemini"):
     if model_choice.lower() == "groq":
@@ -45,6 +60,51 @@ def create_chatbot_chain(model_choice: str = "gemini"):
     )
     
     return chain
+
+
+def process_query_with_context(
+    question: str,
+    user_context: str,
+    chat_history: Optional[List[Dict[str, str]]] = None,
+    model_choice: str = "gemini"
+) -> Dict[str, any]:
+    """
+    Process a query using direct LLM call with user-provided context.
+    This bypasses the vector store and uses the user's actual data from Supabase.
+    """
+    try:
+        llm = create_chatbot_llm(model_choice)
+        
+        # Build messages list
+        messages = []
+        
+        # Add system message with user context
+        system_prompt = DIRECT_CHAT_SYSTEM_PROMPT.format(user_context=user_context)
+        messages.append(SystemMessage(content=system_prompt))
+        
+        # Add chat history
+        if chat_history:
+            for msg in chat_history:
+                if msg["role"] == "user":
+                    messages.append(HumanMessage(content=msg["content"]))
+                elif msg["role"] == "assistant":
+                    messages.append(AIMessage(content=msg["content"]))
+        
+        # Add current question
+        messages.append(HumanMessage(content=question))
+        
+        # Get response from LLM
+        response = llm.invoke(messages)
+        
+        return {
+            "answer": response.content,
+            "sources": [],  # No vector store sources when using direct context
+            "model_used": model_choice
+        }
+        
+    except Exception as e:
+        raise
+
 
 def process_query(
     question: str,

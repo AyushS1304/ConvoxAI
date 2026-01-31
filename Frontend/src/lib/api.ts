@@ -154,6 +154,17 @@ export async function saveConversation(title: string, messages: ChatMessage[]): 
 }
 
 /**
+ * Add messages to an existing conversation
+ */
+export async function addMessagesToConversation(conversationId: string, messages: ChatMessage[]): Promise<void> {
+  try {
+    await apiClient.post(`/chat/${conversationId}/messages`, { messages });
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+/**
  * Get conversation history
  */
 export async function getConversationHistory(limit: number = 50): Promise<ConversationListItem[]> {
@@ -193,11 +204,19 @@ export async function deleteConversation(conversationId: string): Promise<void> 
  */
 
 export interface AudioFileMetadata {
-  id: string;
+  id?: string;
   filename: string;
   storage_url?: string;
+  storage_path?: string;
   file_size: number;
-  created_at: string;
+  // Summary fields
+  summary?: string;
+  transcript?: string;
+  key_aspects?: string[];
+  duration_minutes?: number;
+  no_of_participants?: number;
+  sentiment?: string;
+  created_at?: string;
 }
 
 export interface AudioFileUploadResponse {
@@ -240,11 +259,113 @@ export async function getUserAudioFiles(): Promise<AudioFileMetadata[]> {
 }
 
 /**
+ * Get signed URL for audio file playback
+ */
+export async function getSignedAudioUrl(fileId: string): Promise<string> {
+  try {
+    const response = await apiClient.get(`/storage/file/${fileId}`);
+    return response.data.url;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+/**
  * Delete audio file
  */
 export async function deleteAudioFile(fileId: string): Promise<void> {
   try {
     await apiClient.delete(`/storage/file/${fileId}`);
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+/**
+ * Update file summary data
+ */
+export interface UpdateSummaryData {
+  summary?: string;
+  transcript?: string;
+  key_aspects?: string[];
+  duration_minutes?: number;
+  no_of_participants?: number;
+  sentiment?: string;
+}
+
+export async function updateFileSummary(fileId: string, summaryData: UpdateSummaryData): Promise<void> {
+  try {
+    await apiClient.put(`/storage/file/${fileId}/summary`, summaryData);
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+/**
+ * Chatbot API Functions
+ */
+
+export interface ChatQueryRequest {
+  question: string;
+  chat_history?: ChatMessage[];
+  model_choice?: 'gemini' | 'groq';
+}
+
+export interface SourceDocument {
+  content: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface ChatQueryResponse {
+  answer: string;
+  sources: SourceDocument[];
+  model_used: string;
+}
+
+/**
+ * Query the AI chatbot with conversation context
+ */
+export async function queryChatbot(
+  question: string,
+  chatHistory?: ChatMessage[],
+  modelChoice: 'gemini' | 'groq' = 'gemini'
+): Promise<ChatQueryResponse> {
+  try {
+    const response = await apiClient.post('/chat/query', {
+      question,
+      chat_history: chatHistory,
+      model_choice: modelChoice,
+    });
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+/**
+ * Transcript API Functions
+ */
+
+export interface TranscriptResponse {
+  transcript: string;
+}
+
+/**
+ * Get transcript from audio file
+ */
+export async function getTranscript(file: File): Promise<string> {
+  try {
+    const formData = new FormData();
+    formData.append('audio_file', file);
+
+    const response = await apiClient.post('/transcript', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    // The transcript endpoint returns the transcript text directly
+    return response.data;
   } catch (error) {
     throw handleApiError(error);
   }

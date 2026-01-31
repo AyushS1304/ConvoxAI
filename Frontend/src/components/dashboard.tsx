@@ -1,29 +1,252 @@
-import { useState, useRef } from "react"
-import { MoreVertical, Play, Download, Share2, Upload, FileAudio, X, Loader2 } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { MoreVertical, Play, Pause, Download, Share2, Upload, FileAudio, X, Loader2, Sparkles } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AnimatedThemeToggler } from "./ui/animated-theme-toggler"
-import { summarizeAudio, uploadAudioFile, type AudioFileMetadata, type AudioFileUploadResponse } from "@/lib/api"
+import { summarizeAudio, uploadAudioFile, updateFileSummary, getSignedAudioUrl, type AudioFileMetadata, type AudioFileUploadResponse } from "@/lib/api"
 import type { SummaryResponse } from "@/types/api"
+import { jsPDF } from "jspdf"
 
 
 interface DashboardProps {
   selectedCall: string | null
   setSelectedCall: (id: string | null) => void
+  selectedFile?: AudioFileMetadata | null
+  onClearSelectedFile?: () => void
+  onRefreshSidebar?: () => void
+  onGoToChat?: () => void
 }
 
-export function Dashboard({ selectedCall, setSelectedCall }: DashboardProps) {
+export function Dashboard({ 
+  selectedCall, 
+  setSelectedCall, 
+  selectedFile: selectedAudioFile, 
+  onClearSelectedFile, 
+  onRefreshSidebar,
+  onGoToChat
+}: DashboardProps) {
   const [summaryData, setSummaryData] = useState<SummaryResponse | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [uploadedFileMetadata, setUploadedFileMetadata] = useState<AudioFileMetadata | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const prevSelectedAudioFile = useRef<AudioFileMetadata | null | undefined>(undefined)
+
+  // Load selected file data from sidebar OR clear when null
+  useEffect(() => {
+    if (selectedAudioFile && selectedAudioFile.summary) {
+      setSummaryData({
+        summary: selectedAudioFile.summary,
+        transcript: selectedAudioFile.transcript || undefined,
+        key_aspects: selectedAudioFile.key_aspects || [],
+        duration_minutes: selectedAudioFile.duration_minutes || 0,
+        no_of_participants: selectedAudioFile.no_of_participants || 0,
+        sentiment: (selectedAudioFile.sentiment as "Positive" | "Negative" | "Neutral") || undefined
+      })
+      setUploadedFileMetadata(selectedAudioFile)
+    } else if (selectedAudioFile === null && prevSelectedAudioFile.current !== undefined) {
+      // Clear state when New Call is clicked (selectedAudioFile changed from something to null)
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+      setIsPlaying(false)
+      setSummaryData(null)
+      setUploadedFileMetadata(null)
+      setSelectedFile(null)
+      setError(null)
+    }
+    prevSelectedAudioFile.current = selectedAudioFile
+  }, [selectedAudioFile])
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+    }
+  }, [])
 
   const allowedExtensions = ['.wav', '.mp3', '.m4a', '.flac', '.ogg']
   const allowedMimeTypes = ['audio/wav', 'audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/flac', 'audio/ogg']
+
+  // Play/Pause audio
+  const handlePlayAudio = async () => {
+    if (!uploadedFileMetadata?.id) return
+
+    if (isPlaying && audioRef.current) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+      return
+    }
+
+    try {
+      setIsLoadingAudio(true)
+      const signedUrl = await getSignedAudioUrl(uploadedFileMetadata.id)
+      
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+      
+      const audio = new Audio(signedUrl)
+      audioRef.current = audio
+      
+      audio.onended = () => setIsPlaying(false)
+      audio.onerror = () => {
+        setIsPlaying(false)
+        setError('Failed to play audio')
+      }
+      
+      await audio.play()
+      setIsPlaying(true)
+    } catch (err) {
+      console.error('Failed to play audio:', err)
+      setError('Failed to play audio')
+    } finally {
+      setIsLoadingAudio(false)
+    }
+  }
+
+  // Download PDF report
+  const handleDownloadPDF = () => {
+    if (!summaryData || !uploadedFileMetadata) return
+
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    let yPos = 20
+
+    // Title
+    doc.setFontSize(20)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Call Summary Report', pageWidth / 2, yPos, { align: 'center' })
+    yPos += 15
+
+    // File info
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100)
+    doc.text(`File: ${uploadedFileMetadata.filename}`, 20, yPos)
+    yPos += 6
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, yPos)
+    yPos += 15
+
+    // Summary section
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(0)
+    doc.text('Summary', 20, yPos)
+    yPos += 8
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    const summaryLines = doc.splitTextToSize(summaryData.summary, pageWidth - 40)
+    doc.text(summaryLines, 20, yPos)
+    yPos += summaryLines.length * 5 + 10
+
+    // Stats
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Call Statistics', 20, yPos)
+    yPos += 8
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Duration: ${summaryData.duration_minutes || 0} minutes`, 20, yPos)
+    yPos += 6
+    doc.text(`Participants: ${summaryData.no_of_participants || 0}`, 20, yPos)
+    yPos += 6
+    doc.text(`Sentiment: ${summaryData.sentiment || 'N/A'}`, 20, yPos)
+    yPos += 12
+
+    // Key Aspects
+    if (summaryData.key_aspects && summaryData.key_aspects.length > 0) {
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Key Discussion Points', 20, yPos)
+      yPos += 8
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      summaryData.key_aspects.forEach((aspect, index) => {
+        if (yPos > 270) {
+          doc.addPage()
+          yPos = 20
+        }
+        const aspectLines = doc.splitTextToSize(`• ${aspect}`, pageWidth - 45)
+        doc.text(aspectLines, 25, yPos)
+        yPos += aspectLines.length * 5 + 3
+      })
+      yPos += 5
+    }
+
+    // Transcript
+    if (summaryData.transcript) {
+      if (yPos > 200) {
+        doc.addPage()
+        yPos = 20
+      }
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Transcript', 20, yPos)
+      yPos += 8
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      const transcriptLines = doc.splitTextToSize(summaryData.transcript, pageWidth - 40)
+      transcriptLines.forEach((line: string) => {
+        if (yPos > 280) {
+          doc.addPage()
+          yPos = 20
+        }
+        doc.text(line, 20, yPos)
+        yPos += 5
+      })
+    }
+
+    // Save
+    const fileName = uploadedFileMetadata.filename.replace(/\.[^/.]+$/, '')
+    doc.save(`${fileName}_report.pdf`)
+  }
+
+  // Share functionality
+  const handleShare = async () => {
+    if (!summaryData || !uploadedFileMetadata) return
+
+    const shareText = `📞 Call Summary: ${uploadedFileMetadata.filename}\n\n` +
+      `📝 Summary:\n${summaryData.summary}\n\n` +
+      `⏱️ Duration: ${summaryData.duration_minutes || 0} min | 👥 Participants: ${summaryData.no_of_participants || 0}\n` +
+      `💬 Sentiment: ${summaryData.sentiment || 'N/A'}\n\n` +
+      (summaryData.key_aspects && summaryData.key_aspects.length > 0 
+        ? `🔑 Key Points:\n${summaryData.key_aspects.map(a => `• ${a}`).join('\n')}`
+        : '')
+
+    // Try Web Share API first
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Call Summary: ${uploadedFileMetadata.filename}`,
+          text: shareText
+        })
+        return
+      } catch (err) {
+        // User cancelled or share failed, fallback to clipboard
+      }
+    }
+
+    // Fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(shareText)
+      // Show a temporary success message (you could use a toast here)
+      alert('Summary copied to clipboard!')
+    } catch (err) {
+      console.error('Failed to copy:', err)
+      setError('Failed to share')
+    }
+  }
 
   const handleFileSelect = (file: File) => {
     const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
@@ -87,6 +310,20 @@ export function Dashboard({ selectedCall, setSelectedCall }: DashboardProps) {
       // Then, summarize the audio
       const response = await summarizeAudio(selectedFile)
       setSummaryData(response)
+      
+      // Save summary data to database
+      await updateFileSummary(uploadResponse.file_id, {
+        summary: response.summary,
+        transcript: response.transcript,
+        key_aspects: response.key_aspects,
+        duration_minutes: response.duration_minutes,
+        no_of_participants: response.no_of_participants,
+        sentiment: response.sentiment
+      })
+      
+      // Refresh sidebar to show new file
+      onRefreshSidebar?.()
+      
       setSelectedFile(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process audio file')
@@ -104,10 +341,17 @@ export function Dashboard({ selectedCall, setSelectedCall }: DashboardProps) {
   }
 
   const handleNewUpload = () => {
+    // Stop any playing audio
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    setIsPlaying(false)
     setSummaryData(null)
     setUploadedFileMetadata(null)
     setSelectedFile(null)
     setError(null)
+    onClearSelectedFile?.()
   }
 
   return (
@@ -125,14 +369,44 @@ export function Dashboard({ selectedCall, setSelectedCall }: DashboardProps) {
             <AnimatedThemeToggler className="pr-4" />
             {summaryData && (
               <>
-                <Button variant="outline" size="icon">
-                  <Play className="w-4 h-4" />
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={handlePlayAudio}
+                  disabled={isLoadingAudio || !uploadedFileMetadata?.id}
+                  title={isPlaying ? "Pause" : "Play"}
+                >
+                  {isLoadingAudio ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : isPlaying ? (
+                    <Pause className="w-4 h-4" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
                 </Button>
-                <Button variant="outline" size="icon">
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={handleDownloadPDF}
+                  title="Download PDF Report"
+                >
                   <Download className="w-4 h-4" />
                 </Button>
-                <Button variant="outline" size="icon">
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={handleShare}
+                  title="Share Summary"
+                >
                   <Share2 className="w-4 h-4" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => onGoToChat?.()}
+                  title="Analyze with AI"
+                >
+                  <Sparkles className="w-4 h-4" />
                 </Button>
                 <Button variant="ghost" size="icon">
                   <MoreVertical className="w-4 h-4" />
@@ -298,7 +572,7 @@ export function Dashboard({ selectedCall, setSelectedCall }: DashboardProps) {
                         Size: {(uploadedFileMetadata.file_size / 1024 / 1024).toFixed(2)} MB
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Uploaded: {new Date(uploadedFileMetadata.created_at).toLocaleString()}
+                        Uploaded: {uploadedFileMetadata.created_at ? new Date(uploadedFileMetadata.created_at).toLocaleString() : 'Unknown'}
                       </p>
                     </CardContent>
                   </Card>

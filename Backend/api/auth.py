@@ -123,11 +123,18 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             detail="Invalid or expired token"
         )
 
-
 # Dependency for protected routes
+class AuthContext:
+    """Context object containing authenticated user and access token."""
+    def __init__(self, user, access_token: str):
+        self.user = user
+        self.access_token = access_token
+        # Expose user.id directly for convenience
+        self.id = user.id
+
 async def get_authenticated_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> dict:
+) -> AuthContext:
     try:
         user = await get_user_from_token(credentials.credentials)
         
@@ -138,7 +145,7 @@ async def get_authenticated_user(
                 headers={"WWW-Authenticate": "Bearer"}
             )
         
-        return user
+        return AuthContext(user=user, access_token=credentials.credentials)
         
     except HTTPException:
         raise
