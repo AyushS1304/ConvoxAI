@@ -18,7 +18,11 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LogOut, User } from 'lucide-react';
 
-export function UserProfile() {
+interface UserProfileProps {
+  onGoToProfile?: () => void;
+}
+
+export function UserProfile({ onGoToProfile }: UserProfileProps) {
   const { user, signOut } = useAuth();
 
   if (!user) return null;
@@ -35,7 +39,7 @@ export function UserProfile() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10">
-            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white">
+            <AvatarFallback className="bg-primary text-primary-foreground">
               {initials}
             </AvatarFallback>
           </Avatar>
@@ -51,7 +55,10 @@ export function UserProfile() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="cursor-pointer">
+        <DropdownMenuItem 
+          className="cursor-pointer"
+          onClick={onGoToProfile}
+        >
           <User className="mr-2 h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>

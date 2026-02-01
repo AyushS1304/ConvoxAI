@@ -187,3 +187,96 @@ body {
     animation: none;
     mix-blend-mode: normal;
 }
+
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--muted);
+}
+
+/* Firefox Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) var(--muted);
+}
+
+/* Dark mode scrollbar adjustments */
+.dark ::-webkit-scrollbar-track {
+  background: var(--muted);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Auto-resize utility classes */
+.resize-none {
+  resize: none;
+}
+
+.resize-y {
+  resize: vertical;
+  min-height: 100px;
+  max-height: 400px;
+}
+
+.resize-x {
+  resize: horizontal;
+  min-width: 200px;
+  max-width: 600px;
+}
+
+.resize-both {
+  resize: both;
+  min-width: 200px;
+  min-height: 100px;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Ensure all scrollable containers show scrollbars on hover */
+.overflow-auto,
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-scroll,
+.overflow-y-scroll,
+.overflow-x-scroll {
+  scrollbar-gutter: stable;
+}
+
+/* Prevent content from causing horizontal scroll */
+body {
+  overflow-x: hidden;
+}
+
+/* Ensure proper sizing for flex children */
+.flex-1 {
+  min-width: 0;
+  min-height: 0;
+}

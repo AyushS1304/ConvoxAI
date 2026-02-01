@@ -309,6 +309,7 @@ export interface ChatQueryRequest {
   question: string;
   chat_history?: ChatMessage[];
   model_choice?: 'gemini' | 'groq';
+  selected_call_id?: string;
 }
 
 export interface SourceDocument {
@@ -328,13 +329,15 @@ export interface ChatQueryResponse {
 export async function queryChatbot(
   question: string,
   chatHistory?: ChatMessage[],
-  modelChoice: 'gemini' | 'groq' = 'gemini'
+  modelChoice: 'gemini' | 'groq' = 'gemini',
+  selectedCallId?: string
 ): Promise<ChatQueryResponse> {
   try {
     const response = await apiClient.post('/chat/query', {
       question,
       chat_history: chatHistory,
       model_choice: modelChoice,
+      selected_call_id: selectedCallId,
     });
     return response.data;
   } catch (error) {

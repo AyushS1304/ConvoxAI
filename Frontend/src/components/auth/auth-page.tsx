@@ -9,6 +9,7 @@ import { LoginForm } from './login-form';
 import { SignUpForm } from './signup-form';
 import { Card, CardContent } from '@/components/ui/card';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
+import { Phone } from 'lucide-react';
 
 export function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -23,20 +24,8 @@ export function AuthPage() {
       <div className="w-full max-w-md">
 
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 mb-4">
-            <svg
-              className="w-8 h-8 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-              />
-            </svg>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-primary shadow-lg mb-4">
+            <Phone className="w-8 h-8 text-primary-foreground" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">ConvoxAI</h2>
           <p className="text-gray-600 dark:text-gray-400">AI-Powered Call Summarization</p>

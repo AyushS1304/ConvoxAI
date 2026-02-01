@@ -1,21 +1,24 @@
-import { useState, useEffect } from "react"
-import { Send, Paperclip, Mic, Trash2, Loader2 } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { Send, Paperclip, Mic, Trash2, Loader2, X, FileIcon, MicOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { saveConversation, getConversationHistory, getConversation, deleteConversation, queryChatbot, addMessagesToConversation, type ChatMessage, type ConversationListItem } from "@/lib/api"
+import { saveConversation, getConversationHistory, getConversation, deleteConversation, queryChatbot, addMessagesToConversation, getTranscript, type ChatMessage, type ConversationListItem, type AudioFileMetadata } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
 
 interface ChatInterfaceProps {
   selectedCall: string | null
+  selectedFile: AudioFileMetadata | null
 }
 
-export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
+export function ChatInterface({ selectedCall, selectedFile }: ChatInterfaceProps) {
   const { user } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
-      content: "Hi! I'm your Call Analysis Assistant. Ask me anything about the recent call summary, transcripts, or action items.",
+      content: selectedFile 
+        ? `Hi! I'm ConvoBot, your AI call assistant. I can see you're viewing "${selectedFile.filename}". Ask me anything about this call or your other recent calls.`
+        : "Hi! I'm ConvoBot, your AI call assistant. Ask me anything about your call summaries, transcripts, or action items.",
     },
   ])
   const [input, setInput] = useState("")
@@ -23,6 +26,13 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingDuration, setRecordingDuration] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Load conversation history on mount (only if user is authenticated)
   useEffect(() => {
@@ -30,6 +40,18 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
       loadConversations()
     }
   }, [user])
+
+  // Update welcome message when selectedFile changes
+  useEffect(() => {
+    if (messages.length === 1 && messages[0].role === "assistant") {
+      setMessages([{
+        role: "assistant",
+        content: selectedFile 
+          ? `Hi! I'm ConvoBot, your AI call assistant. I can see you're viewing "${selectedFile.filename}". Ask me anything about this call or your other recent calls.`
+          : "Hi! I'm ConvoBot, your AI call assistant. Ask me anything about your call summaries, transcripts, or action items.",
+      }])
+    }
+  }, [selectedFile])
 
   const loadConversations = async () => {
     if (!user) return // Don't load if not authenticated
@@ -54,25 +76,132 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
     }
   }
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+  const handleFileAttach = () => {
+    fileInputRef.current?.click()
+  }
 
-    const newMessage: ChatMessage = {
-      role: "user",
-      content: input,
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Check file size (max 50MB)
+      if (file.size > 50 * 1024 * 1024) {
+        alert('File size must be less than 50MB')
+        return
+      }
+      setAttachedFile(file)
     }
+  }
 
-    const updatedMessages = [...messages, newMessage]
-    setMessages(updatedMessages)
+  const removeAttachment = () => {
+    setAttachedFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        const audioFile = new File([audioBlob], `recording-${Date.now()}.webm`, { type: 'audio/webm' })
+        setAttachedFile(audioFile)
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+      setRecordingDuration(0)
+
+      // Start timer
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1)
+      }, 1000)
+    } catch (error) {
+      console.error('Failed to start recording:', error)
+      alert('Unable to access microphone. Please grant permission and try again.')
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current)
+        recordingTimerRef.current = null
+      }
+    }
+  }
+
+  const handleVoiceInput = () => {
+    if (isRecording) {
+      stopRecording()
+    } else {
+      startRecording()
+    }
+  }
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const handleSend = async () => {
+    if ((!input.trim() && !attachedFile) || isLoading) return
+
+    const currentAttachment = attachedFile
+    let messageContent = input.trim()
+    
+    // Clear input and attachment immediately for better UX
     setInput("")
+    setAttachedFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
     setIsLoading(true)
 
     try {
-      // Get AI response from chatbot API
+      // If there's a voice recording (webm file), transcribe it first
+      if (currentAttachment && currentAttachment.name.includes('recording-') && currentAttachment.type.includes('audio')) {
+        try {
+          const transcriptData = await getTranscript(currentAttachment)
+          // getTranscript returns string directly
+          messageContent = transcriptData || messageContent || 'Voice message'
+        } catch (transcriptError) {
+          console.error('Failed to transcribe voice recording:', transcriptError)
+          messageContent = messageContent || '[Voice message - transcription failed]'
+        }
+      } else if (currentAttachment) {
+        // For other attachments, just note the file
+        messageContent = `${messageContent || 'Attached file'} [File: ${currentAttachment.name}]`
+      }
+
+      const newMessage: ChatMessage = {
+        role: "user",
+        content: messageContent,
+      }
+
+      const updatedMessages = [...messages, newMessage]
+      setMessages(updatedMessages)
+
+      // Get AI response from chatbot API with selected call context
       const response = await queryChatbot(
-        input,
+        newMessage.content,
         messages.filter(m => m.role === 'user' || m.role === 'assistant'),
-        'gemini'
+        'gemini',
+        selectedFile?.id // Pass the selected call ID for context
       )
 
       const aiResponse: ChatMessage = {
@@ -90,6 +219,8 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
         role: "assistant",
         content: "I'm sorry, I encountered an error processing your request. Please try again.",
       }
+      const userMsg: ChatMessage = { role: "user", content: messageContent || input }
+      const updatedMessages = [...messages, userMsg]
       const messagesWithError = [...updatedMessages, errorResponse]
       setMessages(messagesWithError)
     } finally {
@@ -137,7 +268,9 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
       if (conversationId === currentConversationId) {
         setMessages([{
           role: "assistant",
-          content: "Hi! I'm your Call Analysis Assistant. Ask me anything about the recent call summary, transcripts, or action items.",
+          content: selectedFile 
+            ? `Hi! I'm ConvoBot, your AI call assistant. I can see you're viewing "${selectedFile.filename}". Ask me anything about this call or your other recent calls.`
+            : "Hi! I'm ConvoBot, your AI call assistant. Ask me anything about your call summaries, transcripts, or action items.",
         }])
         setCurrentConversationId(null)
       }
@@ -149,15 +282,17 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
   const startNewConversation = () => {
     setMessages([{
       role: "assistant",
-      content: "Hi! I'm your Call Analysis Assistant. Ask me anything about the recent call summary, transcripts, or action items.",
+      content: selectedFile 
+        ? `Hi! I'm ConvoBot, your AI call assistant. I can see you're viewing "${selectedFile.filename}". Ask me anything about this call or your other recent calls.`
+        : "Hi! I'm ConvoBot, your AI call assistant. Ask me anything about your call summaries, transcripts, or action items.",
     }])
     setCurrentConversationId(null)
   }
 
   return (
-    <div className="flex-1 flex h-full">
+    <div className="flex-1 flex h-full overflow-hidden">
       {/* Conversation History Sidebar */}
-      <div className="w-64 border-r border-border flex flex-col">
+      <div className="w-64 border-r border-border flex flex-col overflow-hidden flex-shrink-0">
         <div className="p-4 border-b border-border">
           <Button onClick={startNewConversation} className="w-full" size="sm">
             New Conversation
@@ -173,9 +308,9 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0" onClick={() => loadConversation(conv.id)}>
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {conv.title}
+                  <div className="flex-1 min-w-0 overflow-hidden" onClick={() => loadConversation(conv.id)}>
+                    <p className="text-sm font-medium text-foreground truncate max-w-[180px]">
+                      {conv.title.length > 25 ? conv.title.substring(0, 25) + '...' : conv.title}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {conv.message_count} messages
@@ -184,7 +319,7 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleDeleteConversation(conv.id)
@@ -203,9 +338,9 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <div className="border-b border-border p-6">
-          <h2 className="text-xl font-bold text-foreground">Call Analysis Chat</h2>
+          <h2 className="text-xl font-bold text-foreground">ConvoBot</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {isLoading ? 'AI is thinking...' : isSaving ? 'Saving...' : 'Ask questions about your calls'}
+            {selectedFile ? `Viewing: ${selectedFile.filename}` : isLoading ? 'AI is thinking...' : isSaving ? 'Saving...' : 'Your AI call assistant'}
           </p>
         </div>
 
@@ -248,25 +383,72 @@ export function ChatInterface({ selectedCall }: ChatInterfaceProps) {
         {/* Input */}
         <div className="border-t border-border p-6">
           <div className="max-w-2xl mx-auto">
+            {/* Attached File Preview */}
+            {attachedFile && (
+              <div className="mb-3 flex items-center gap-2 p-2 bg-muted rounded-md">
+                <FileIcon className="w-4 h-4 text-primary" />
+                <span className="text-sm flex-1 truncate">{attachedFile.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {(attachedFile.size / 1024 / 1024).toFixed(2)} MB
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={removeAttachment}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            )}
+            
+            {/* Recording Indicator */}
+            {isRecording && (
+              <div className="mb-3 flex items-center gap-2 p-2 bg-red-500/10 rounded-md">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <span className="text-sm text-red-600 font-medium">Recording...</span>
+                <span className="text-sm text-red-600">{formatDuration(recordingDuration)}</span>
+              </div>
+            )}
+
             <div className="flex gap-3">
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="audio/*,.pdf,.doc,.docx,.txt"
+                className="hidden"
+              />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="text-muted-foreground hover:text-primary"
+                onClick={handleFileAttach}
+                disabled={isRecording}
+              >
                 <Paperclip className="w-4 h-4" />
               </Button>
               <div className="flex-1 flex gap-2">
                 <Input
-                  placeholder="Ask about the call..."
+                  placeholder={isRecording ? "Recording in progress..." : "Ask about the call..."}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                  onKeyPress={(e) => e.key === "Enter" && !isRecording && handleSend()}
                   className="bg-muted border-0 text-foreground placeholder:text-muted-foreground"
+                  disabled={isRecording}
                 />
-                <Button variant="ghost" size="icon" className="text-muted-foreground">
-                  <Mic className="w-4 h-4" />
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className={`${isRecording ? 'text-red-600 hover:text-red-700' : 'text-muted-foreground hover:text-primary'}`}
+                  onClick={handleVoiceInput}
+                >
+                  {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </Button>
               </div>
               <Button
                 onClick={handleSend}
-                disabled={!input.trim() || isSaving || isLoading}
+                disabled={(!input.trim() && !attachedFile) || isSaving || isLoading || isRecording}
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

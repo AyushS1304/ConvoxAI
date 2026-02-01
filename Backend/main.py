@@ -17,10 +17,10 @@ def main():
     
     logger = logging.getLogger(__name__)
     logger.info("=" * 60)
-    logger.info("🚀 Starting ConvoxAI Backend Server")
-    logger.info(f"📊 Log Level: {log_level}")
-    logger.info(f"🌐 Server: http://0.0.0.0:8000")
-    logger.info(f"📚 API Docs: http://localhost:8000/docs")
+    logger.info(" Starting ConvoxAI Backend Server")
+    logger.info(f" Log Level: {log_level}")
+    logger.info(f" Server: http://0.0.0.0:8000")
+    logger.info(f" API Docs: http://localhost:8000/docs")
     logger.info("=" * 60)
     
     uvicorn.run(

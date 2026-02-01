@@ -124,6 +124,7 @@ class ChatQueryRequest(BaseModel):
     question: str = Field(..., description="User's question about calls")
     chat_history: Optional[List[ChatMessage]] = Field(default=None, description="Optional conversation history")
     model_choice: Optional[Literal["gemini", "groq"]] = Field(default="gemini", description="LLM model to use")
+    selected_call_id: Optional[str] = Field(default=None, description="ID of the currently selected/viewed call for context")
 
 class SourceDocument(BaseModel):
     content: str = Field(..., description="Content of the source document")

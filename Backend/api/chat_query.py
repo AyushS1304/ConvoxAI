@@ -10,39 +10,86 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["Chatbot"])
 
 
-def build_user_context(audio_files: list) -> str:
-    """Build context string from user's audio files"""
+def build_user_context(audio_files: list, selected_call_id: str = None) -> str:
+    """Build context string from user's audio files, prioritizing selected call"""
     if not audio_files:
         return ""
     
-    context_parts = ["Here is information about the user's recent calls:\n"]
+    # Separate selected call from others
+    selected_call = None
+    other_calls = []
     
     for file in audio_files:
-        context_parts.append(f"\n--- Call: {file.get('filename', 'Unknown')} ---")
+        if selected_call_id and file.get('id') == selected_call_id:
+            selected_call = file
+        else:
+            other_calls.append(file)
+    
+    context_parts = []
+    
+    # If there's a selected call, put it first with clear marking
+    if selected_call:
+        context_parts.append("=== CURRENTLY SELECTED CALL (User is viewing this call) ===\n")
+        context_parts.append(f"Filename: {selected_call.get('filename', 'Unknown')}")
+        context_parts.append(f"Created: {selected_call.get('created_at', 'Unknown')}")
         
-        if file.get('summary'):
-            context_parts.append(f"Summary: {file['summary']}")
+        if selected_call.get('summary'):
+            context_parts.append(f"\nSummary: {selected_call['summary']}")
         
-        if file.get('duration_minutes'):
-            context_parts.append(f"Duration: {file['duration_minutes']} minutes")
+        if selected_call.get('duration_minutes'):
+            context_parts.append(f"Duration: {selected_call['duration_minutes']} minutes")
         
-        if file.get('no_of_participants'):
-            context_parts.append(f"Participants: {file['no_of_participants']}")
+        if selected_call.get('no_of_participants'):
+            context_parts.append(f"Participants: {selected_call['no_of_participants']}")
         
-        if file.get('sentiment'):
-            context_parts.append(f"Sentiment: {file['sentiment']}")
+        if selected_call.get('sentiment'):
+            context_parts.append(f"Sentiment: {selected_call['sentiment']}")
         
-        if file.get('key_aspects'):
-            aspects = file['key_aspects']
+        if selected_call.get('key_aspects'):
+            aspects = selected_call['key_aspects']
             if isinstance(aspects, list):
                 context_parts.append(f"Key Points: {', '.join(aspects)}")
             elif isinstance(aspects, str):
                 context_parts.append(f"Key Points: {aspects}")
         
-        if file.get('transcript'):
-            # Include first 3000 chars of transcript for more context
-            transcript = file['transcript'][:3000]
-            context_parts.append(f"Transcript excerpt: {transcript}")
+        if selected_call.get('transcript'):
+            # Include more of the transcript for selected call
+            transcript = selected_call['transcript'][:5000]
+            context_parts.append(f"\nTranscript: {transcript}")
+        
+        context_parts.append("\n" + "="*60 + "\n")
+    
+    # Add other calls
+    if other_calls:
+        context_parts.append("\n=== OTHER RECENT CALLS ===\n")
+        
+        for file in other_calls[:5]:  # Limit to 5 other calls to avoid token limits
+            context_parts.append(f"\n--- Call: {file.get('filename', 'Unknown')} ---")
+            context_parts.append(f"Created: {file.get('created_at', 'Unknown')}")
+            
+            if file.get('summary'):
+                context_parts.append(f"Summary: {file['summary']}")
+            
+            if file.get('duration_minutes'):
+                context_parts.append(f"Duration: {file['duration_minutes']} minutes")
+            
+            if file.get('no_of_participants'):
+                context_parts.append(f"Participants: {file['no_of_participants']}")
+            
+            if file.get('sentiment'):
+                context_parts.append(f"Sentiment: {file['sentiment']}")
+            
+            if file.get('key_aspects'):
+                aspects = file['key_aspects']
+                if isinstance(aspects, list):
+                    context_parts.append(f"Key Points: {', '.join(aspects)}")
+                elif isinstance(aspects, str):
+                    context_parts.append(f"Key Points: {aspects}")
+            
+            # Include less transcript for other calls
+            if file.get('transcript'):
+                transcript = file['transcript'][:1000]
+                context_parts.append(f"Transcript excerpt: {transcript}...")
     
     return "\n".join(context_parts)
 
@@ -52,7 +99,7 @@ async def query_chatbot(
     request: ChatQueryRequest,
     auth: AuthContext = Depends(get_authenticated_user)
 ):
-    logger.info(f"Chat query received from user_id: {auth.id}, question: {request.question[:50]}...")
+    logger.info(f"Chat query received from user_id: {auth.id}, question: {request.question[:50]}..., selected_call: {request.selected_call_id}")
     try:
         # Fetch user's audio files to provide context
         audio_files = await get_records(
@@ -62,8 +109,8 @@ async def query_chatbot(
         
         logger.debug(f"Fetched {len(audio_files)} audio files for user {auth.id}")
         
-        # Build context from user's calls
-        user_context = build_user_context(audio_files)
+        # Build context from user's calls, prioritizing selected call
+        user_context = build_user_context(audio_files, request.selected_call_id)
         
         chat_history = None
         if request.chat_history:
@@ -74,7 +121,7 @@ async def query_chatbot(
         
         # Use direct context-based query if user has audio files
         if user_context:
-            logger.info(f"Using direct context query with {len(audio_files)} files")
+            logger.info(f"Using direct context query with {len(audio_files)} files, selected_call: {request.selected_call_id}")
             result = process_query_with_context(
                 question=request.question,
                 user_context=user_context,

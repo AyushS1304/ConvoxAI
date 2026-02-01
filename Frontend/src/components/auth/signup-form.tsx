@@ -63,7 +63,7 @@ export function SignUpForm({ onToggleForm }: SignUpFormProps) {
   return (
     <div className="w-full max-w-md space-y-6">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
           Create Account
         </h1>
         <p className="text-muted-foreground">Join ConvoxAI and start summarizing calls</p>
@@ -155,7 +155,7 @@ export function SignUpForm({ onToggleForm }: SignUpFormProps) {
         <span className="text-muted-foreground">Already have an account? </span>
         <button
           onClick={onToggleForm}
-          className="text-blue-600 hover:underline font-medium"
+          className="text-primary hover:underline font-medium"
           type="button"
         >
           Sign in

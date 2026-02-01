@@ -355,8 +355,9 @@ export function Dashboard({
   }
 
   return (
-    <div className="flex-1 overflow-auto">
-      <div className="p-8">
+    <div className="flex-1 h-full overflow-hidden flex flex-col">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-8 min-h-0">
         {/* Header */}
         <div className="mb-8 flex items-start justify-between">
           <div>
@@ -620,6 +621,7 @@ export function Dashboard({
             </Tabs>
           </>
         )}
+        </div>
       </div>
     </div>
   )

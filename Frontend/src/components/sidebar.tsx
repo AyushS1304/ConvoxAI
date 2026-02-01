@@ -8,13 +8,14 @@ import { useAuth } from "@/contexts/auth-context"
 
 
 interface SidebarProps {
-  activeView: "dashboard" | "chat"
-  setActiveView: (view: "dashboard" | "chat") => void
+  activeView: "dashboard" | "chat" | "profile"
+  setActiveView: (view: "dashboard" | "chat" | "profile") => void
   onSelectFile?: (file: AudioFileMetadata | null) => void
   refreshKey?: number
   isCollapsed?: boolean
   onToggleCollapse?: () => void
   onGoToChat?: () => void
+  onGoToProfile?: () => void
 }
 
 export function Sidebar({ 
@@ -24,7 +25,8 @@ export function Sidebar({
   refreshKey,
   isCollapsed = false,
   onToggleCollapse,
-  onGoToChat
+  onGoToChat,
+  onGoToProfile
 }: SidebarProps) {
   const { user } = useAuth()
   const [audioFiles, setAudioFiles] = useState<AudioFileMetadata[]>([])
@@ -92,26 +94,38 @@ export function Sidebar({
 
   return (
     <aside 
-      className={`${isCollapsed ? 'w-16' : 'w-64'} bg-card border-r border-border flex flex-col h-full transition-all duration-300 ease-in-out`}
+      className={`${isCollapsed ? 'w-16' : 'w-64'} bg-card border-r border-border flex flex-col h-full overflow-hidden transition-all duration-300 ease-in-out flex-shrink-0`}
     >
       {/* Header */}
       <div className={`p-4 border-b border-border ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
-        <div className={`flex items-center ${isCollapsed ? 'justify-center mb-4' : 'justify-between gap-2 mb-6'}`}>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-              <Phone className="w-4 h-4 text-primary-foreground" />
+        <div className={`flex items-center ${isCollapsed ? 'flex-col mb-4' : 'justify-between mb-6'}`}>
+          <div className={`flex items-center ${isCollapsed ? 'flex-col gap-2' : 'gap-3'}`}>
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+              <Phone className="w-5 h-5 text-primary-foreground" />
             </div>
-            {!isCollapsed && <h1 className="text-lg font-semibold text-foreground">CallSum</h1>}
+            {!isCollapsed && <h1 className="text-lg font-semibold text-foreground">ConvoxAI</h1>}
           </div>
-          <Button 
+          {!isCollapsed && (
+            <Button  
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6"
+              onClick={onToggleCollapse}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+        {isCollapsed && (
+          <Button  
             variant="ghost" 
             size="icon" 
-            className={`h-6 w-6 ${isCollapsed ? 'mb-2' : ''}`}
+            className="h-6 w-6 mb-2"
             onClick={onToggleCollapse}
           >
-            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            <ChevronRight className="w-4 h-4" />
           </Button>
-        </div>
+        )}
         <Button 
           className="w-full relative group" 
           size={isCollapsed ? "icon" : "sm"} 
@@ -250,7 +264,7 @@ export function Sidebar({
 
       {/* Footer - User Profile */}
       <div className={`p-4 border-t border-border ${isCollapsed ? 'flex justify-center' : ''}`}>
-        <UserProfile />
+        <UserProfile onGoToProfile={onGoToProfile} />
       </div>
     </aside>
   )
