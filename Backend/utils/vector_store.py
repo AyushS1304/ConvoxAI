@@ -15,7 +15,9 @@ from config import (
 pc = Pinecone(api_key=PINECONE_API_KEY)
 
 def get_or_create_index():
-    if not pc.has_index(PINECONE_INDEX_NAME):
+    existing_indexes = [i["name"] for i in pc.list_indexes()]
+
+    if PINECONE_INDEX_NAME not in existing_indexes:
         pc.create_index(
             name=PINECONE_INDEX_NAME,
             dimension=PINECONE_DIMENSION,
@@ -25,11 +27,13 @@ def get_or_create_index():
                 region=PINECONE_REGION
             )
         )
+
     return PINECONE_INDEX_NAME
 
-def ingest_text_chunks(chunks):
+def ingest_text_chunks(chunks: list[str]):
     embeddings = load_embeddings()
     index_name = get_or_create_index()
+
     vectorstore = PineconeVectorStore.from_texts(
         texts=chunks,
         embedding=embeddings,
@@ -39,10 +43,12 @@ def ingest_text_chunks(chunks):
 
 def get_retriever():
     embeddings = load_embeddings()
+
     vectorstore = PineconeVectorStore(
         index_name=PINECONE_INDEX_NAME,
         embedding=embeddings
     )
+
     return vectorstore.as_retriever(
         search_type=RETRIEVER_SEARCH_TYPE,
         search_kwargs={"k": RETRIEVER_TOP_K}

@@ -48,7 +48,7 @@ def create_chatbot_llm(model_choice: str = "gemini"):
         )
 
 
-def create_chatbot_chain(model_choice: str = "gemini"):
+def create_chatbot_chain(model_choice: str = "groq"):
     llm = create_chatbot_llm(model_choice)
     retriever = get_retriever()
     chain = ConversationalRetrievalChain.from_llm(

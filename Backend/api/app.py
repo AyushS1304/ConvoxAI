@@ -95,14 +95,14 @@ async def model_check(request: ModelTestRequest):
         )
     
     model_name, llm, model_id = models[request.user_choice]
-    logger.debug(f"Testing {model_name} with query: {request.query[:50]}...")
+    logger.debug(f"Testing {model_name} with query: {request.query[:400]}...")
     
     try:
         response = llm.invoke(request.query)
         logger.info(f"{model_name} test successful")
         return APIResponse(
             status="Success",
-            message=f"{model_name} is working! Response: {response.content[:100]}...",
+            message=f"{model_name} is working! Response: {response.content[:400]}...",
             model_info={
                 "llm_model": model_id,
                 "whisper_model": WHISPER_MODEL_SIZE,
