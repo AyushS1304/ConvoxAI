@@ -39,8 +39,8 @@ ConvoxAI is an end-to-end intelligent call analysis system that transcribes audi
 - **Audio Processing**: PyDub, Faster Whisper
 
 ### Frontend Stack
-- **Framework**: React 19 with TypeScript
-- **Build Tool**: Vite (Rolldown)
+- **Framework**: React with TypeScript
+- **Build Tool**: Vite
 - **Styling**: Tailwind CSS 4
 - **UI Components**: Radix UI + shadcn/ui
 - **State Management**: React Hooks & Context API
@@ -401,5 +401,3 @@ For issues and questions:
 - [ ] Integration with CRM systems
 
 ---
-
-** Build using FastAPI, React. **
