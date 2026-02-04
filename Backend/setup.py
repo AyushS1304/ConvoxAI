@@ -12,8 +12,8 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name="convoxai",
     version="0.1.0",
-    author="Dhruv Agarwal,Ayush Sharma,Aniket shah",
-    author_email="dhruv610agg@gmail.com,ayushsharma130408@gmail.com,aniketshah2402@gmail.com",
+    author="Dhruv Agarwal,Ayush Sharma",
+    author_email="dhruv610agg@gmail.com,ayushsharma130408@gmail.com",
     description="AI-Powered Call Summarization using RAG - ConvoxAi",
     long_description=long_description,
     long_description_content_type="text/markdown",
