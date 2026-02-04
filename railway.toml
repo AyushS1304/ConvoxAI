@@ -3,5 +3,6 @@ builder = "dockerfile"
 dockerfilePath = "Backend/Dockerfile"
 
 [deploy]
-startCommand = "python main.py"
 restartPolicyType = "on_failure"
+healthcheckPath = "/health"
+healthcheckTimeout = 100

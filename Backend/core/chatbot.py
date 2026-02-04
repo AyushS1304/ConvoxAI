@@ -19,7 +19,6 @@ chatbot_prompt_template = PromptTemplate.from_template(
     template=CHATBOT_PROMPT
 )
 
-# System prompt for direct context-based chat
 DIRECT_CHAT_SYSTEM_PROMPT = """You are an AI assistant specialized in analyzing call summaries and transcripts.
 Your role is to help users understand their call data by answering questions based on the provided context.
 
@@ -74,10 +73,6 @@ def process_query_with_context(
     chat_history: Optional[List[Dict[str, str]]] = None,
     model_choice: str = "gemini"
 ) -> Dict[str, any]:
-    """
-    Process a query using direct LLM call with user-provided context.
-    This bypasses the vector store and uses the user's actual data from Supabase.
-    """
     try:
         llm = create_chatbot_llm(model_choice)
         
@@ -104,7 +99,7 @@ def process_query_with_context(
         
         return {
             "answer": response.content,
-            "sources": [],  # No vector store sources when using direct context
+            "sources": [],
             "model_used": model_choice
         }
         

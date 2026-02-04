@@ -39,22 +39,19 @@ PINECONE_REGION = "us-east-1"
 RETRIEVER_SEARCH_TYPE = "similarity"
 RETRIEVER_TOP_K = 5
 
-# Supabase Configuration
+
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
-
-# JWT Configuration
 JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
-# Audio File Configuration
 ALLOWED_AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".ogg"}
 ALLOWED_AUDIO_MIME_TYPES = {
     "audio/wav", "audio/mpeg", "audio/mp4",
     "audio/x-m4a", "audio/flac", "audio/ogg"
 }
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+MAX_FILE_SIZE = 50 * 1024 * 1024
 AUDIO_BUCKET_NAME = "audio-files"
 

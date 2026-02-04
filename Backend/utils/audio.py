@@ -4,7 +4,6 @@ import os
 from config import WHISPER_MODEL_SIZE
 import logging
 
-# Try to import pydub, but handle Python 3.13 compatibility issue
 try:
     from pydub import AudioSegment
     PYDUB_AVAILABLE = True

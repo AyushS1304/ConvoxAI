@@ -6,7 +6,7 @@ from core.summarizer import generate_summary, create_gemini_llm, create_groq_llm
 from core.models import SummaryResponse
 from config import GEMINI_MODEL_NAME, WHISPER_MODEL_SIZE, GROQ_MODEL_NAME
 from utils.validation import validate_audio_file
-from api import auth, storage, chat_history, chat_query
+from app import auth, storage, chat_history, chat_query
 from utils.audio import transcribe_audio_simple
 import os
 import tempfile
@@ -56,6 +56,8 @@ app.add_middleware(
         "http://localhost:3000",  
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
+        "https://*.railway.app",  # Allow Railway deployments
+        "*"  # Allow all origins for development (restrict in production)
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -87,6 +89,15 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
         "model":"/models"
+    }
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Health check endpoint for Railway and monitoring."""
+    return {
+        "status": "healthy",
+        "service": "ConvoxAI Backend",
+        "version": "1.0.0"
     }
 
 @app.post("/models", response_model=APIResponse, tags=["Model"])

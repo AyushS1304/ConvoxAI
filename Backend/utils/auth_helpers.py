@@ -1,20 +1,8 @@
-"""
-Authentication helper utilities.
-"""
-
 from core.models import UserResponse
 
 
 def create_user_response(user) -> UserResponse:
-    """
-    Convert Supabase user object to UserResponse model.
     
-    Args:
-        user: Supabase user object
-        
-    Returns:
-        UserResponse model instance
-    """
     return UserResponse(
         id=user.id,
         email=user.email,

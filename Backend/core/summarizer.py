@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore")
 
 def create_gemini_llm():
-    """Create and return a Google Gemini LLM instance."""
     return ChatGoogleGenerativeAI(
         model=GEMINI_MODEL_NAME,
         api_key=GEMINI_API_KEY,
@@ -26,7 +25,6 @@ def create_gemini_llm():
     )
 
 def create_groq_llm():
-    """Create and return a Groq LLM instance."""
     return ChatGroq(
         model=GROQ_MODEL_NAME,
         api_key=GROQ_API_KEY,
@@ -50,7 +48,6 @@ def generate_summary(audio_file_path: str | None = None) -> dict:
     response = st_llm.invoke(final_prompt)
     logger.info("Summary generation complete")
     
-    # Return both the structured response and the transcript
     return {
         "summary": response.summary,
         "duration_minutes": response.duration_minutes,

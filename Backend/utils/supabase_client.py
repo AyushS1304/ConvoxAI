@@ -1,21 +1,9 @@
-"""
-Supabase Client Utility Module
-Centralized Supabase client and helper functions for
-authentication, storage, and database operations with RLS support.
-"""
-
 from supabase import create_client, Client
 from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
 from typing import Optional, Dict, Any, List
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-# ------------------------------------------------------------------
-# CLIENT SINGLETONS
-# ------------------------------------------------------------------
-
 class SupabaseClient:
     _anon: Optional[Client] = None
     _service: Optional[Client] = None
@@ -34,19 +22,9 @@ class SupabaseClient:
 
 
 def get_authed_rls_client(access_token: str) -> Client:
-    """
-    Create a client that respects RLS by forwarding the user's JWT.
-    IMPORTANT: This client is ONLY for database (.table) usage.
-    NOT for storage.
-    """
     client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     client.postgrest.auth(access_token)
     return client
-
-
-# ------------------------------------------------------------------
-# AUTHENTICATION
-# ------------------------------------------------------------------
 
 async def sign_up_user(email: str, password: str, metadata: Optional[Dict[str, Any]] = None):
     logger.debug(f"Signing up user: {email}")
@@ -96,10 +74,6 @@ async def get_user_from_token(access_token: str):
     return res.user
 
 
-# ------------------------------------------------------------------
-# STORAGE (SERVICE ROLE ONLY)
-# ------------------------------------------------------------------
-
 async def upload_file_to_storage(
     bucket_name: str,
     file_path: str,
@@ -118,7 +92,6 @@ async def upload_file_to_storage(
         },
     )
 
-    # Return public URL
     public_url = client.storage.from_(bucket_name).get_public_url(file_path)
     logger.info(f"File uploaded successfully to: {file_path}")
     return public_url
@@ -137,10 +110,6 @@ async def get_signed_file_url(bucket_name: str, file_path: str, expires_in: int)
     res = client.storage.from_(bucket_name).create_signed_url(file_path, expires_in)
     return res["signedURL"]
 
-
-# ------------------------------------------------------------------
-# DATABASE (RLS SAFE)
-# ------------------------------------------------------------------
 
 async def insert_record(table: str, data: Dict[str, Any], access_token: str):
     logger.debug(f"Inserting record into table: {table}")
