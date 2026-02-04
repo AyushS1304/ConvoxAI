@@ -10,7 +10,7 @@ from core.models import (
 )
 from utils.supabase_client import insert_record, get_records, delete_record, update_record
 from utils.db_helpers import get_user_conversation
-from api.auth import get_authenticated_user, AuthContext
+from app.auth import get_authenticated_user, AuthContext
 from typing import List
 import logging
 import uuid

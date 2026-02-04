@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from core.models import ChatQueryRequest, ChatQueryResponse, SourceDocument
 from core.chatbot import process_query, process_query_with_context
-from api.auth import get_authenticated_user, AuthContext
+from app.auth import get_authenticated_user, AuthContext
 from utils.supabase_client import get_records
 import logging
 

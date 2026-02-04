@@ -16,7 +16,7 @@ from utils.supabase_client import (
     delete_record,
     update_record,
 )
-from api.auth import get_authenticated_user, security, AuthContext
+from app.auth import get_authenticated_user, security, AuthContext
 from pathlib import Path
 from typing import List, Optional
 import logging
@@ -33,7 +33,7 @@ ALLOWED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".ogg"}
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
 
-# Request model for updating summary data
+
 class UpdateSummaryRequest(BaseModel):
     summary: Optional[str] = None
     transcript: Optional[str] = None
@@ -43,7 +43,7 @@ class UpdateSummaryRequest(BaseModel):
     sentiment: Optional[str] = None
 
 
-# ---------------- UPLOAD ---------------- #
+
 
 @router.post("/upload", response_model=AudioFileUploadResponse)
 async def upload_audio_file(
@@ -64,13 +64,12 @@ async def upload_audio_file(
         file_size = len(file_data)
         logger.debug(f"File read: size={file_size} bytes, type={audio_file.content_type}")
 
-        # if file_size > MAX_FILE_SIZE:
-        #     raise HTTPException(413, "File too large (max 50MB)")
+
 
         file_id = str(uuid.uuid4())
         filename = f"{file_id}{ext}"
 
-        # MUST match storage RLS: folder = auth.uid()
+
         storage_path = f"{user.id}/{filename}"
 
         storage_url = await upload_file_to_storage(
@@ -111,7 +110,7 @@ async def upload_audio_file(
         raise HTTPException(500, str(e))
 
 
-# ---------------- LIST ---------------- #
+
 
 @router.get("/files", response_model=List[AudioFileMetadata])
 async def list_user_files(user=Depends(get_authenticated_user)):
@@ -131,7 +130,7 @@ async def list_user_files(user=Depends(get_authenticated_user)):
         raise HTTPException(500, "Failed to retrieve files")
 
 
-# ---------------- GET FILE ---------------- #
+
 
 @router.get("/file/{file_id}")
 async def get_file(file_id: str, user=Depends(get_authenticated_user)):
@@ -169,7 +168,7 @@ async def get_file(file_id: str, user=Depends(get_authenticated_user)):
         raise HTTPException(500, "Failed to retrieve file")
 
 
-# ---------------- DELETE ---------------- #
+
 
 @router.delete("/file/{file_id}")
 async def delete_file(
@@ -207,7 +206,7 @@ async def delete_file(
         raise HTTPException(500, "Failed to delete file")
 
 
-# ---------------- UPDATE SUMMARY ---------------- #
+
 
 @router.put("/file/{file_id}/summary")
 async def update_file_summary(
@@ -219,7 +218,7 @@ async def update_file_summary(
     """Update the summary data for an audio file."""
     logger.info(f"Updating summary for file_id={file_id}, user_id={user.id}")
     try:
-        # Verify file belongs to user
+
         files = await get_records(
             table="audio_files",
             filters={"id": file_id, "user_id": user.id},
@@ -228,7 +227,7 @@ async def update_file_summary(
         if not files:
             raise HTTPException(404, "File not found")
 
-        # Build update data (only include non-None values)
+
         update_data = {}
         if summary_data.summary is not None:
             update_data["summary"] = summary_data.summary
