@@ -4,9 +4,33 @@
 
 Railway supports two deployment approaches for this project:
 
-### Option 1: Separate Services (Recommended)
+### Prerequisites
 
-Deploy backend and frontend as separate Railway services for better scalability and independent scaling.
+1. **Install Railway CLI** (if deploying via CLI):
+   
+   **Windows (PowerShell):**
+   ```powershell
+   iwr https://railway.app/install.ps1 | iex
+   ```
+   
+   **macOS/Linux:**
+   ```bash
+   curl -fsSL https://railway.app/install.sh | sh
+   ```
+   
+   **Alternative (npm):**
+   ```bash
+   npm install -g @railway/cli
+   ```
+
+2. **Login to Railway:**
+   ```bash
+   railway login
+   ```
+
+### Option 1: Deploy via Railway Dashboard (Recommended for Beginners)
+
+This is the easiest method and doesn't require the Railway CLI.
 
 #### Backend Deployment
 
@@ -14,7 +38,7 @@ Deploy backend and frontend as separate Railway services for better scalability 
    - Go to [Railway](https://railway.app)
    - Click "New Project" → "Deploy from GitHub repo"
    - Select your ConvoxAI repository
-   - Choose "Backend" as the root directory
+   - Railway will detect the root `railway.toml` and deploy the Backend automatically
 
 2. **Configure Environment Variables**
    
@@ -30,8 +54,8 @@ Deploy backend and frontend as separate Railway services for better scalability 
    ```
 
 3. **Deploy**
-   - Railway will automatically detect the `Dockerfile` in the Backend directory
-   - The `railway.toml` file configures the build and deployment
+   - Railway will automatically detect the `Dockerfile` via the root `railway.toml`
+   - The build will use `Backend/Dockerfile`
    - Note your backend URL (e.g., `https://your-backend.railway.app`)
 
 #### Frontend Deployment
@@ -56,7 +80,72 @@ Deploy backend and frontend as separate Railway services for better scalability 
    
    Since Vite bakes environment variables at build time, you need to trigger a rebuild whenever you change environment variables.
 
-### Option 2: Monorepo Deployment
+### Option 2: Deploy via Railway CLI
+
+If you prefer command-line deployment:
+
+#### Backend Deployment
+
+1. **Navigate to project root:**
+   ```bash
+   cd ConvoxAI
+   ```
+
+2. **Initialize Railway project:**
+   ```bash
+   railway init
+   ```
+   - Select "Create new project" or link to existing project
+   - Railway will detect the root `railway.toml` configuration
+
+3. **Set environment variables:**
+   ```bash
+   railway variables set Groq_API_Key=your_groq_api_key
+   railway variables set Gemini_API_Key=your_gemini_api_key
+   railway variables set Pinecone_API_Key=your_pinecone_api_key
+   railway variables set SUPABASE_URL=your_supabase_url
+   railway variables set SUPABASE_KEY=your_supabase_anon_key
+   railway variables set SUPABASE_SERVICE_KEY=your_supabase_service_key
+   railway variables set JWT_SECRET=your_jwt_secret
+   ```
+
+4. **Deploy:**
+   ```bash
+   railway up
+   ```
+
+5. **Get your deployment URL:**
+   ```bash
+   railway domain
+   ```
+
+#### Frontend Deployment (Separate Service)
+
+1. **Create a new service in the same project:**
+   ```bash
+   railway service create frontend
+   ```
+
+2. **Link to the frontend service:**
+   ```bash
+   railway service
+   ```
+   Select the frontend service you just created.
+
+3. **Set environment variables:**
+   ```bash
+   railway variables set VITE_SUPABASE_URL=your_supabase_url
+   railway variables set VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   railway variables set VITE_API_BASE_URL=https://your-backend.railway.app
+   ```
+
+4. **Deploy from Frontend directory:**
+   ```bash
+   cd Frontend
+   railway up
+   ```
+
+### Option 3: Monorepo Deployment
 
 Deploy from the root directory (less common for Railway):
 
