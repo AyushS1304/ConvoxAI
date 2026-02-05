@@ -1,0 +1,3 @@
+# Use Node.js 20 for Vite compatibility
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-10_x"]
